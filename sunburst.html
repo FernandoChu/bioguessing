@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clade Sunburst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&display=swap">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+.arc{cursor:pointer;stroke:var(--bg);stroke-width:1px}
+.arc:hover{filter:brightness(1.06)}
+.slabel{pointer-events:none;text-anchor:middle;dominant-baseline:central;fill:var(--ink)}
+.slabel .n{font-family:var(--serif);font-weight:600}
+.slabel .c{font-family:var(--sans);fill:var(--muted)}
+.centre{cursor:pointer}
+.centre circle{fill:var(--surface);stroke:var(--line)}
+.centre:hover circle{stroke:var(--accent)}
+.centre .n{font-family:var(--serif);font-weight:600;fill:var(--ink);text-anchor:middle}
+.centre .c,.centre .up{font-family:var(--sans);fill:var(--muted);text-anchor:middle}
+.centre .up{fill:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">BioGuessing · prototype 2 of 4</p>
+    <h1>Sunburst</h1>
+    <p class="lede">Each ring is one level deeper in the tree, and each clade is an arc sitting directly outside its parent. Click an arc once to select it and again to open it. Click the centre to go back up.</p>
+    <nav id="nav"></nav>
+  </header>
+  <div class="layout">
+    <div class="stage">
+      <svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Zoomable sunburst of animal clades">
+        <g id="world" transform="translate(500,500)">
+          <g id="arcs"></g>
+          <g id="marks"></g>
+          <g id="labels"></g>
+          <g id="route"></g>
+          <g class="centre" id="centre">
+            <circle></circle>
+            <text class="up"></text>
+            <text class="n"></text>
+            <text class="c"></text>
+          </g>
+          <g id="pins"></g>
+        </g>
+      </svg>
+    </div>
+    <aside id="panel"></aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="shared/data.js"></script>
+<script src="shared/ui.js"></script>
+<script>
+const { root, nodes } = BG;
+const svg = d3.select("#svg");
+const R0 = 105, R1 = 490, RINGS = 4, RW = (R1 - R0) / RINGS;
+d3.partition().size([1, root.height + 1])(root);
+
+// current view: angular window [x0, x1] and the depth of the clade in the centre
+let V = { x0: 0, x1: 1, d: 0 }, focusN = root, anim = null;
+let hoverN = null, selN = null, result = null, px = 0.7;
+const u = v => v / px;
+
+const ang = x => Math.max(0, Math.min(2 * Math.PI, (x - V.x0) / (V.x1 - V.x0) * 2 * Math.PI));
+const inner = n => Math.max(R0, R0 + (n.depth - V.d - 1) * RW);
+const outer = n => Math.min(R1, R0 + (n.depth - V.d) * RW);
+const visible = n => n.depth > V.d + 0.001 && inner(n) < outer(n) - 0.5 && ang(n.x1) - ang(n.x0) > 1e-4;
+const arc = d3.arc().startAngle(n => ang(n.x0)).endAngle(n => ang(n.x1))
+  .innerRadius(inner).outerRadius(outer)
+  .padAngle(n => Math.min((ang(n.x1) - ang(n.x0)) / 2, 0.003)).padRadius(R1 / 2);
+const mid = n => {
+  const a = (ang(n.x0) + ang(n.x1)) / 2, r = (inner(n) + outer(n)) / 2;
+  return { a, r, p: [r * Math.sin(a), -r * Math.cos(a)] };
+};
+
+function render() {
+  px = BG.pxPerUnit(svg.node());
+  const vis = nodes.filter(visible);
+  d3.select("#arcs").selectAll("path").data(vis, n => n.name).join("path")
+    .attr("class", "arc fill-h")
+    .attr("style", n => `--h:${n.hue.toFixed(1)};--dl:${(n.depth % 2 ? 3 : -2) + "%"}`)
+    .attr("d", arc)
+    .on("pointerenter", (e, n) => BG.hover(n))
+    .on("pointerleave", () => BG.hover(null))
+    .on("click", (e, n) => onArc(n));
+
+  // labels: along the ring if they fit, otherwise radial, otherwise hidden
+  const fsPx = 11.5, lab = [];
+  vis.forEach(n => {
+    const m = mid(n), arcPx = (ang(n.x1) - ang(n.x0)) * m.r * px, ringPx = (outer(n) - inner(n)) * px;
+    const nameW = n.name.length * fsPx * 0.6, comW = n.data.common.length * fsPx * 0.5;
+    const deg = m.a * 180 / Math.PI;
+    if (arcPx >= nameW + 8 && ringPx >= fsPx + 4) {
+      const flip = m.a > Math.PI / 2 && m.a < 3 * Math.PI / 2;
+      lab.push({ n, m, rot: flip ? deg + 180 : deg, common: arcPx >= comW + 8 && ringPx >= fsPx * 2.8 });
+    } else if (ringPx >= nameW + 10 && arcPx >= fsPx + 1) {
+      lab.push({ n, m, rot: m.a > Math.PI ? deg + 90 : deg - 90, common: false });
+    }
+  });
+  d3.select("#labels").selectAll("text").data(lab, d => d.n.name).join(enter => {
+    const t = enter.append("text").attr("class", "slabel");
+    t.append("tspan").attr("class", "n");
+    t.append("tspan").attr("class", "c");
+    return t;
+  })
+    .attr("transform", d => `translate(${d.m.p[0].toFixed(1)},${d.m.p[1].toFixed(1)}) rotate(${d.rot.toFixed(2)})`)
+    .each(function (d) {
+      const t = d3.select(this), fs = u(fsPx);
+      t.select(".n").attr("x", 0).attr("dy", d.common ? -fs * 0.55 : 0).style("font-size", fs + "px").text(d.n.name);
+      t.select(".c").attr("x", 0).attr("dy", d.common ? fs * 1.15 : 0).style("font-size", fs * 0.85 + "px")
+        .text(d.common ? d.n.data.common : "");
+    });
+
+  // centre disc shows the clade you are inside
+  const cg = d3.select("#centre");
+  cg.select("circle").attr("r", R0 - 6).style("stroke-width", u(1.5) + "px");
+  cg.select(".up").attr("y", -u(26)).style("font-size", u(11) + "px").text(focusN.parent ? "↑ " + focusN.parent.name : "");
+  cg.select(".n").attr("y", u(2)).style("font-size", u(focusN.name.length > 11 ? 14 : 17) + "px").text(focusN.name);
+  cg.select(".c").attr("y", u(22)).style("font-size", u(11.5) + "px").text(focusN.data.common);
+
+  drawMarks();
+}
+
+// the arc that stands for n in the current view (n itself, or its deepest visible ancestor)
+function rep(n) {
+  if (!focusN.descendants().includes(n) || n === focusN) return null;
+  return n.ancestors().find(a => a.depth <= focusN.depth + RINGS);
+}
+
+function drawMarks() {
+  const outlines = [], pins = [], route = [];
+  const outline = (n, w) => { const r = n && rep(n); if (r && visible(r)) outlines.push({ n: r, w }); };
+  if (result) {
+    if (!result.same) outline(result.anc, 3.5);
+    const g = rep(result.guess), a = rep(result.answer);
+    const pt = n => n ? mid(n).p : [0, 0];
+    if (g) pins.push({ x: pt(g)[0], y: pt(g)[1], kind: "guess" });
+    if (a) pins.push({ x: pt(a)[0], y: pt(a)[1], kind: "answer" });
+    route.push([pt(g), result.same ? pt(a) : pt(rep(result.anc)), pt(a)]);
+  } else {
+    if (hoverN && hoverN !== selN) outline(hoverN, 2);
+    if (selN) {
+      outline(selN, 3);
+      const r = rep(selN);
+      if (r) { const p = mid(r).p; pins.push({ x: p[0], y: p[1], kind: "pick" }); }
+    }
+  }
+  d3.select("#marks").selectAll("path").data(outlines).join("path").attr("class", "hl-area")
+    .attr("d", d => arc(d.n)).style("stroke-width", d => u(d.w) + "px");
+  d3.select("#route").selectAll("path").data(route).join("path").attr("class", "hl-line")
+    .attr("d", d => "M" + d.map(p => p.map(v => v.toFixed(1)).join(",")).join("L"))
+    .style("stroke-width", u(3) + "px").style("stroke-dasharray", `${u(2)} ${u(6)}`);
+  BG.drawPins(d3.select("#pins"), pins, u(1));
+}
+
+function focusTo(n) {
+  if (!n.children) n = n.parent;
+  focusN = n;
+  const from = { ...V }, to = { x0: n.x0, x1: n.x1, d: n.depth };
+  const ease = d3.easeCubicInOut, dur = 650;
+  if (anim) anim.stop();
+  anim = d3.timer(el => {
+    const t = Math.min(1, el / dur), e = ease(t);
+    V = { x0: from.x0 + (to.x0 - from.x0) * e, x1: from.x1 + (to.x1 - from.x1) * e, d: from.d + (to.d - from.d) * e };
+    render();
+    if (t === 1) { anim.stop(); anim = null; }
+  });
+}
+
+function onArc(n) {
+  if (BG.selected() === n && n.children) focusTo(n);
+  else BG.click(n);
+}
+d3.select("#centre").on("click", () => { if (focusN.parent) focusTo(focusN.parent); });
+
+BG.nav("sunburst.html");
+BG.init({
+  highlight(n) { hoverN = n; drawMarks(); },
+  select(n) { selN = n; drawMarks(); },
+  focus(n) { focusTo(n.parent || n); },
+  reveal(res) {
+    result = res;
+    if (res) focusTo(res.anc.parent || res.anc);
+    else drawMarks();
+  },
+  reset() { focusTo(root); },
+}, {
+  about: `<ol class="legend">
+    <li><b>Outward is deeper.</b> Every clade is an arc directly outside its parent, so everything inside one arc's span belongs to it.</li>
+    <li><b>Only four levels at a time.</b> Open an arc to see what is inside it. The centre shows where you are.</li>
+    <li><b>Any level can be a guess.</b> Selecting an inner ring is a broad guess, and an outer ring is a precise one.</li>
+    <li><b>Rings are levels, not time.</b> A single ring can mix a 500-million-year-old split with a 60-million-year-old one, which is this layout's main weakness.</li>
+  </ol>`,
+});
+new ResizeObserver(() => render()).observe(svg.node());
+render();
+</script>
+</body>
+</html>

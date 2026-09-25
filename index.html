@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BioGuessing Prototypes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&display=swap">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{display:flex;flex-direction:column;gap:8px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);text-decoration:none}
+.card:hover{border-color:var(--accent)}
+.card h2{font-family:var(--serif);font-weight:600;font-size:20px;margin:0}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.card dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13.5px}
+.card dt{color:var(--muted)}
+.card dd{margin:0}
+.card.muted{opacity:.75}
+.note{max-width:70ch;color:var(--muted);margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">BioGuessing</p>
+    <h1>Ways to draw the tree of life</h1>
+    <p class="lede">Four layouts of the same 55 animal groups, each with the same explore mode and sample guessing round. Compare how well each one lets you find your way around and judge how related two groups are.</p>
+    <nav id="nav"></nav>
+  </header>
+  <div class="cards">
+    <a class="card" href="radial.html">
+      <h2>Radial time tree</h2>
+      <p>Angle is lineage, radius is time, with geological periods as rings. Small clades are wedges that open as you zoom.</p>
+      <dl><dt>Adjacency</dt><dd>Meaningful: every clade is one slice</dd><dt>Time</dt><dd>Shown</dd><dt>Stable map</dt><dd>Yes</dd></dl>
+    </a>
+    <a class="card" href="sunburst.html">
+      <h2>Sunburst</h2>
+      <p>Rings of nested clades. Click into an arc to go deeper. Guesses can be made at any level.</p>
+      <dl><dt>Adjacency</dt><dd>Meaningful</dd><dt>Time</dt><dd>Not shown</dd><dt>Stable map</dt><dd>Yes, per level</dd></dl>
+    </a>
+    <a class="card" href="hyperbolic.html">
+      <h2>Hyperbolic tree</h2>
+      <p>A magnifying glass over an infinite tree. Drag to move the focus anywhere.</p>
+      <dl><dt>Adjacency</dt><dd>Meaningful</dd><dt>Time</dt><dd>Not shown</dd><dt>Stable map</dt><dd>No, it reshapes as you move</dd></dl>
+    </a>
+    <a class="card" href="strip.html">
+      <h2>Time strip</h2>
+      <p>A standard tree diagram with time left to right and one row per group, scrolled like a long map.</p>
+      <dl><dt>Adjacency</dt><dd>Meaningful: clades are row blocks</dd><dt>Time</dt><dd>Shown</dd><dt>Stable map</dt><dd>Yes, but no overview</dd></dl>
+    </a>
+    <a class="card muted" href="clade-atlas.html">
+      <h2>Voronoi treemap</h2>
+      <p>The first attempt. Nesting is exact, but neighbouring regions can be unrelated.</p>
+      <dl><dt>Adjacency</dt><dd>Not meaningful</dd><dt>Time</dt><dd>Border weight only</dd><dt>Stable map</dt><dd>Yes</dd></dl>
+    </a>
+  </div>
+  <p class="note">Dates are rounded estimates in millions of years. The pages load d3 and fonts from a CDN, so they need an internet connection.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="shared/data.js"></script>
+<script src="shared/ui.js"></script>
+<script>BG.nav("index.html");</script>
+</body>
+</html>

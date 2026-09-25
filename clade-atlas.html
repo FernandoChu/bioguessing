@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clade Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&display=swap">
+<style>
+:root{
+  --bg:#EDF1EE; --surface:#F8FAF8; --ink:#16211D; --muted:#586861; --line:#CBD5CF;
+  --border:#1F2B26; --region:#1F2B26; --halo:rgba(248,250,248,.82);
+  --accent:#0F6479; --accent-soft:rgba(15,100,121,.12); --answer:#C2410C; --guess:#16211D;
+  --dim:rgba(237,241,238,.72); --branch:#16211D;
+  --cell-l:81%; --cell-s:46%;
+  --serif:"Literata",Georgia,"Times New Roman",serif;
+  --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#101614; --surface:#17201D; --ink:#E3EBE7; --muted:#95A59E; --line:#2A3632;
+    --border:#050807; --region:#E3EBE7; --halo:rgba(16,22,20,.8);
+    --accent:#63C7DC; --accent-soft:rgba(99,199,220,.14); --answer:#F2894A; --guess:#E3EBE7;
+    --dim:rgba(16,22,20,.72); --branch:#E3EBE7;
+    --cell-l:31%; --cell-s:32%;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#101614; --surface:#17201D; --ink:#E3EBE7; --muted:#95A59E; --line:#2A3632;
+  --border:#050807; --region:#E3EBE7; --halo:rgba(16,22,20,.8);
+  --accent:#63C7DC; --accent-soft:rgba(99,199,220,.14); --answer:#F2894A; --guess:#E3EBE7;
+  --dim:rgba(16,22,20,.72); --branch:#E3EBE7;
+  --cell-l:31%; --cell-s:32%;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 32px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:68ch;text-wrap:pretty}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.mapbox{position:relative;width:100%;max-width:880px;min-width:0;justify-self:center}
+#map{display:block;width:100%;height:auto;aspect-ratio:1;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#map:active{cursor:grabbing}
+body.guessing #map{cursor:crosshair}
+.zoomctl{position:absolute;right:6px;bottom:6px;display:flex;flex-direction:column;gap:4px}
+.zoomctl button{width:34px;height:34px;font-size:18px;line-height:1;padding:0}
+button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+aside{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.panel h2{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:700}
+.tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.tabs button{border:0;border-radius:0;background:transparent;padding:8px;font-weight:600;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.toggles{display:flex;flex-direction:column;gap:6px}
+.toggles label{display:flex;gap:9px;align-items:center;cursor:pointer}
+.toggles input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.crumbs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.crumbs li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;padding:3px 6px;margin-inline:-6px;border-radius:5px;cursor:pointer}
+.crumbs li:hover{background:var(--accent-soft)}
+.crumbs .n{font-family:var(--serif);font-weight:600}
+.crumbs .c{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumbs .a{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.crumbs li.leaf .n{color:var(--accent)}
+.hint{color:var(--muted);font-size:13.5px;margin:0}
+.legend{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.legend b{font-weight:600}
+.photo{border:1.5px dashed var(--line);border-radius:8px;padding:18px 14px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.photo .cn{font-family:var(--serif);font-size:22px;font-weight:600}
+.photo .sp{font-family:var(--serif);font-style:italic;color:var(--muted)}
+.photo small{color:var(--muted);font-size:12px;margin-top:6px}
+.result{display:flex;flex-direction:column;gap:6px}
+.score{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.score span{font-size:14px;font-weight:500;color:var(--muted)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .6s}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--serif)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+/* svg */
+.cell{fill:hsl(var(--h,150),var(--cell-s),calc(var(--cell-l) + var(--dl,0%)));stroke:var(--border);stroke-opacity:.3;stroke-width:.5px;vector-effect:non-scaling-stroke}
+.border{fill:none;stroke:var(--border);vector-effect:non-scaling-stroke;stroke-linejoin:round;pointer-events:none}
+.hi{fill:none;stroke:var(--accent);vector-effect:non-scaling-stroke;pointer-events:none}
+.mrca{fill:var(--accent-soft);stroke:var(--accent);stroke-width:3.5px;vector-effect:non-scaling-stroke;pointer-events:none}
+.dim{fill:var(--dim);fill-rule:evenodd;pointer-events:none}
+.over{pointer-events:none}
+.rlabel{font-family:var(--sans);font-weight:700;text-transform:uppercase;fill:var(--region);opacity:.42;text-anchor:middle;dominant-baseline:central}
+.llabel{text-anchor:middle;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-linejoin:round}
+.llabel .ln{font-family:var(--serif);font-weight:600}
+.llabel .lc{font-family:var(--sans);fill:var(--muted)}
+.branch{stroke:var(--branch);stroke-linecap:round;fill:none;opacity:.8}
+.bnode{fill:var(--branch)}
+.path{stroke:var(--accent);fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pathnode{fill:var(--accent)}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Clade Atlas</h1>
+    <p>A demo of the animal tree drawn as a map: every clade is a territory and its subclades are the regions inside it. Scroll or pinch to zoom, drag to pan.</p>
+  </header>
+
+  <div class="layout">
+    <div class="mapbox">
+      <svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="Voronoi treemap of animal clades">
+        <g id="world">
+          <g id="cells"></g>
+          <g id="borders"></g>
+          <g id="hilite"></g>
+        </g>
+        <g class="over">
+          <g id="branches"></g>
+          <g id="rlabels"></g>
+          <g id="llabels"></g>
+          <g id="route"></g>
+          <g id="pins"></g>
+        </g>
+      </svg>
+      <div class="zoomctl">
+        <button id="zin" aria-label="Zoom in">+</button>
+        <button id="zout" aria-label="Zoom out">−</button>
+        <button id="zreset" aria-label="Reset view">⤢</button>
+      </div>
+    </div>
+
+    <aside>
+      <div class="tabs" role="group" aria-label="Mode">
+        <button id="tab-explore" aria-pressed="true">Explore</button>
+        <button id="tab-guess" aria-pressed="false">Try a round</button>
+      </div>
+
+      <section class="panel" id="explore-panel">
+        <h2>Where you are</h2>
+        <p class="hint" id="crumb-hint">Hover or tap a region to see its full lineage. Click a line below to zoom to that clade.</p>
+        <ul class="crumbs" id="crumbs"></ul>
+      </section>
+
+      <section class="panel" id="guess-panel" hidden>
+        <h2>Mystery animal</h2>
+        <div class="photo">
+          <span class="cn" id="m-common"></span>
+          <span class="sp" id="m-species"></span>
+          <small>The real game would show only a photo here.</small>
+        </div>
+        <p class="hint" id="guess-hint">Zoom in and click where you think it belongs.</p>
+        <div class="result" id="result" hidden>
+          <div class="score" id="score"></div>
+          <div class="bar"><i id="scorebar" style="width:0"></i></div>
+          <dl class="kv">
+            <dt><span class="swatch" style="background:var(--guess)"></span>Your guess</dt><dd id="r-guess"></dd>
+            <dt><span class="swatch" style="background:var(--answer)"></span>Answer</dt><dd id="r-answer"></dd>
+            <dt>Shared ancestor</dt><dd id="r-mrca"></dd>
+          </dl>
+        </div>
+        <button id="next">Next animal</button>
+      </section>
+
+      <section class="panel">
+        <h2>Layers</h2>
+        <div class="toggles">
+          <label><input type="checkbox" id="t-branches"><span>Draw the tree on the map</span></label>
+          <label><input type="checkbox" id="t-borders" checked><span>Border thickness by age</span></label>
+          <label><input type="checkbox" id="t-colour" checked><span>Colour by lineage</span></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>How to read it</h2>
+        <ol class="legend">
+          <li><b>Inside means descended from.</b> Every region sits entirely within its ancestors' regions.</li>
+          <li><b>Thick borders are old splits.</b> Line weight scales with divergence time, so crossing a heavy line means a distant relative.</li>
+          <li><b>Neighbouring hues are relatives.</b> Each clade gets a slice of the colour wheel, and its subclades divide that slice.</li>
+        </ol>
+        <p class="hint">Simplified tree of 55 animal groups. Dates are rounded estimates in millions of years.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-weighted-voronoi@1.1.3/build/d3-weighted-voronoi.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-voronoi-map@2.1.1/build/d3-voronoi-map.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-voronoi-treemap@1.1.2/build/d3-voronoi-treemap.min.js"></script>
+<script>
+if (!window.d3 || !d3.voronoiTreemap) {
+  document.querySelector(".mapbox").innerHTML =
+    '<p class="hint" style="padding:24px">The map libraries (d3 and d3-voronoi-treemap) did not load. Check your connection or any script blocker, then reload.</p>';
+  throw new Error("d3 / d3-voronoi-treemap missing");
+}
+// ---------- data: [name, common name, age of crown (Mya), children] / leaves: [name, common, ~species]
+const N = (name, common, age, children) => ({ name, common, age, children });
+const L = (name, common, species) => ({ name, common, species });
+
+const TREE = N("Animalia", "animals", 700, [
+  L("Porifera", "sponges", 9000),
+  L("Cnidaria", "jellyfish, corals", 11000),
+  N("Bilateria", "bilaterians", 600, [
+    N("Protostomia", "protostomes", 580, [
+      N("Ecdysozoa", "moulting animals", 560, [
+        L("Nematoda", "roundworms", 25000),
+        N("Arthropoda", "arthropods", 540, [
+          N("Chelicerata", "chelicerates", 500, [
+            L("Arachnida", "spiders, scorpions", 110000),
+            L("Xiphosura", "horseshoe crabs", 4),
+          ]),
+          L("Myriapoda", "centipedes, millipedes", 16000),
+          N("Pancrustacea", "crustaceans & insects", 510, [
+            L("Malacostraca", "crabs, shrimp, woodlice", 40000),
+            L("Branchiopoda", "water fleas", 1200),
+            N("Insecta", "insects", 480, [
+              L("Odonata", "dragonflies", 6000),
+              L("Orthoptera", "grasshoppers, crickets", 29000),
+              L("Hemiptera", "true bugs", 80000),
+              N("Holometabola", "complete metamorphosis", 350, [
+                L("Hymenoptera", "bees, wasps, ants", 150000),
+                L("Coleoptera", "beetles", 400000),
+                L("Lepidoptera", "butterflies, moths", 180000),
+                L("Diptera", "flies, mosquitoes", 150000),
+              ]),
+            ]),
+          ]),
+        ]),
+      ]),
+      N("Spiralia", "spiralians", 570, [
+        N("Mollusca", "molluscs", 540, [
+          L("Gastropoda", "snails, slugs", 65000),
+          L("Bivalvia", "clams, mussels", 9000),
+          L("Cephalopoda", "octopuses, squid", 800),
+        ]),
+        L("Annelida", "segmented worms", 22000),
+        L("Platyhelminthes", "flatworms", 29000),
+      ]),
+    ]),
+    N("Deuterostomia", "deuterostomes", 580, [
+      N("Echinodermata", "echinoderms", 480, [
+        L("Asteroidea", "sea stars", 1900),
+        L("Echinoidea", "sea urchins", 950),
+      ]),
+      N("Chordata", "chordates", 550, [
+        L("Tunicata", "sea squirts", 3000),
+        N("Vertebrata", "vertebrates", 500, [
+          L("Cyclostomata", "lampreys, hagfish", 120),
+          N("Gnathostomata", "jawed vertebrates", 465, [
+            L("Chondrichthyes", "sharks, rays", 1200),
+            N("Osteichthyes", "bony vertebrates", 435, [
+              L("Actinopterygii", "ray-finned fish", 32000),
+              N("Sarcopterygii", "lobe-finned vertebrates", 415, [
+                L("Actinistia", "coelacanths", 2),
+                N("Rhipidistia", "lungfish & tetrapods", 400, [
+                  L("Dipnoi", "lungfish", 6),
+                  N("Tetrapoda", "tetrapods", 352, [
+                    N("Amphibia", "amphibians", 300, [
+                      L("Anura", "frogs, toads", 7600),
+                      L("Caudata", "salamanders, newts", 800),
+                    ]),
+                    N("Amniota", "amniotes", 312, [
+                      N("Mammalia", "mammals", 180, [
+                        L("Monotremata", "platypus, echidnas", 5),
+                        N("Theria", "live-bearing mammals", 160, [
+                          L("Marsupialia", "kangaroos, opossums", 380),
+                          N("Placentalia", "placental mammals", 100, [
+                            L("Afrotheria", "elephants, aardvarks", 90),
+                            L("Xenarthra", "sloths, armadillos", 30),
+                            N("Boreoeutheria", "northern placentals", 90, [
+                              N("Euarchontoglires", "primates, rodents & kin", 85, [
+                                L("Primates", "primates", 500),
+                                L("Rodentia", "rodents", 2500),
+                                L("Lagomorpha", "rabbits, hares", 90),
+                              ]),
+                              N("Laurasiatheria", "laurasiatherians", 80, [
+                                L("Eulipotyphla", "hedgehogs, shrews", 500),
+                                L("Chiroptera", "bats", 1400),
+                                L("Carnivora", "cats, dogs, seals", 290),
+                                L("Perissodactyla", "horses, rhinos", 17),
+                                N("Artiodactyla", "even-toed ungulates & whales", 65, [
+                                  L("Ruminantia", "deer, cattle, giraffes", 200),
+                                  L("Suina", "pigs, peccaries", 20),
+                                  L("Cetacea", "whales, dolphins", 90),
+                                ]),
+                              ]),
+                            ]),
+                          ]),
+                        ]),
+                      ]),
+                      N("Sauropsida", "reptiles & birds", 280, [
+                        N("Lepidosauria", "lizards, snakes, tuatara", 240, [
+                          L("Squamata", "lizards, snakes", 11000),
+                          L("Rhynchocephalia", "tuatara", 1),
+                        ]),
+                        N("Archelosauria", "turtles, crocs & birds", 255, [
+                          L("Testudines", "turtles", 360),
+                          N("Archosauria", "crocodiles & birds", 245, [
+                            L("Crocodylia", "crocodiles, alligators", 27),
+                            N("Aves", "birds", 100, [
+                              L("Palaeognathae", "ostriches, kiwis", 60),
+                              N("Neognathae", "neognath birds", 85, [
+                                L("Galloanserae", "ducks, chickens", 450),
+                                N("Neoaves", "most other birds", 70, [
+                                  L("Sphenisciformes", "penguins", 18),
+                                  L("Strigiformes", "owls", 250),
+                                  L("Accipitriformes", "hawks, eagles", 260),
+                                  L("Psittaciformes", "parrots", 400),
+                                  L("Passeriformes", "songbirds", 6500),
+                                ]),
+                              ]),
+                            ]),
+                          ]),
+                        ]),
+                      ]),
+                    ]),
+                  ]),
+                ]),
+              ]),
+            ]),
+          ]),
+        ]),
+      ]),
+    ]),
+  ]),
+]);
+
+const MYSTERY = [
+  ["Orca", "Orcinus orca", "Cetacea"],
+  ["Western honey bee", "Apis mellifera", "Hymenoptera"],
+  ["Common octopus", "Octopus vulgaris", "Cephalopoda"],
+  ["Axolotl", "Ambystoma mexicanum", "Caudata"],
+  ["Atlantic horseshoe crab", "Limulus polyphemus", "Xiphosura"],
+  ["Platypus", "Ornithorhynchus anatinus", "Monotremata"],
+  ["Tuatara", "Sphenodon punctatus", "Rhynchocephalia"],
+  ["Sea lamprey", "Petromyzon marinus", "Cyclostomata"],
+  ["Emperor penguin", "Aptenodytes forsteri", "Sphenisciformes"],
+  ["Aardvark", "Orycteropus afer", "Afrotheria"],
+  ["Common woodlouse", "Oniscus asellus", "Malacostraca"],
+  ["Coelacanth", "Latimeria chalumnae", "Actinistia"],
+  ["Giant panda", "Ailuropoda melanoleuca", "Carnivora"],
+  ["Vase tunicate", "Ciona intestinalis", "Tunicata"],
+  ["Common eastern firefly", "Photinus pyralis", "Coleoptera"],
+];
+
+// ---------- layout
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const C = 500, R = 482;
+const clip = d3.range(96).map(i => {
+  const a = (i / 96) * 2 * Math.PI;
+  return [C + R * Math.cos(a), C + R * Math.sin(a)];
+});
+const root = d3.hierarchy(TREE).sum(d => d.children ? 0 : 1 + Math.log10(d.species + 1));
+d3.voronoiTreemap().clip(clip).prng(mulberry32(7)).convergenceRatio(0.003).maxIterationCount(120)(root);
+
+const nodes = root.descendants();
+const leaves = root.leaves();
+const byName = new Map(nodes.map(n => [n.data.name, n]));
+nodes.forEach(n => {
+  n.centroid = d3.polygonCentroid(n.polygon);
+  n.area = Math.abs(d3.polygonArea(n.polygon));
+  n.pathD = "M" + n.polygon.join("L") + "Z";
+  const ext = d3.extent(n.polygon, p => p[0]), eyt = d3.extent(n.polygon, p => p[1]);
+  n.bbox = [ext[0], eyt[0], ext[1], eyt[1]];
+});
+
+// hue bands: each clade gets a slice of the wheel proportional to its leaf count
+(function assignHue(n, h0, h1) {
+  n.hue = (h0 + h1) / 2;
+  if (!n.children) return;
+  const total = d3.sum(n.children, c => c.leaves().length);
+  let h = h0;
+  n.children.forEach((c, i) => {
+    const w = (h1 - h0) * c.leaves().length / total;
+    c.sib = i;
+    assignHue(c, h, h + w);
+    h += w;
+  });
+})(root, 10, 350);
+
+const ageW = age => {
+  const t = (Math.log(age) - Math.log(60)) / (Math.log(700) - Math.log(60));
+  return 0.6 + 3.4 * Math.max(0, Math.min(1, t));
+};
+const depthW = n => Math.max(0.6, 3.6 - 0.25 * n.depth);
+
+// ---------- draw static world
+const svg = d3.select("#map");
+const world = d3.select("#world");
+const cellSel = d3.select("#cells").selectAll("path").data(leaves).join("path")
+  .attr("class", "cell").attr("d", n => n.pathD);
+const internal = nodes.filter(n => n.children).sort((a, b) => b.depth - a.depth);
+const borderSel = d3.select("#borders").selectAll("path").data(internal).join("path")
+  .attr("class", "border").attr("d", n => n.pathD);
+
+function paintCells() {
+  const byLineage = document.getElementById("t-colour").checked;
+  const palette = d3.schemeTableau10;
+  cellSel.attr("style", (n, i) => {
+    if (byLineage) {
+      return `--h:${n.hue.toFixed(1)};--dl:${n.sib % 2 ? "4%" : "-2%"}`;
+    }
+    // arbitrary colours for comparison: adjacent relatives no longer share hue
+    const h = (i * 137.5) % 360;
+    return `--h:${h.toFixed(1)};--dl:0%`;
+  });
+}
+function paintBorders() {
+  const byAge = document.getElementById("t-borders").checked;
+  borderSel.style("stroke-width", n => (byAge ? ageW(n.data.age) : depthW(n)) + "px");
+}
+paintCells(); paintBorders();
+
+// ---------- zoom
+let T = d3.zoomIdentity;
+const zoom = d3.zoom().scaleExtent([1, 14]).translateExtent([[0, 0], [1000, 1000]])
+  .on("zoom", e => { T = e.transform; world.attr("transform", T); renderOverlay(); });
+svg.call(zoom).on("dblclick.zoom", null);
+const zoomBy = f => svg.transition().duration(350).call(zoom.scaleBy, f);
+document.getElementById("zin").onclick = () => zoomBy(1.8);
+document.getElementById("zout").onclick = () => zoomBy(1 / 1.8);
+document.getElementById("zreset").onclick = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+function zoomTo(n) {
+  const [x0, y0, x1, y1] = n.bbox;
+  const k = Math.min(14, 0.86 * 1000 / Math.max(x1 - x0, y1 - y0));
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  svg.transition().duration(650).call(zoom.transform,
+    d3.zoomIdentity.translate(500, 500).scale(Math.max(1, k)).translate(-cx, -cy));
+}
+
+// ---------- overlay (drawn in screen space so text and pins keep their size)
+let pxPerUnit = 1;
+const unit = px => px / pxPerUnit;           // screen px -> viewBox units
+const P = p => T.apply(p);
+
+function renderOverlay() {
+  pxPerUnit = (svg.node().getBoundingClientRect().width || 700) / 1000;
+  const k = T.k, s2 = (k * pxPerUnit) ** 2;
+  const inView = ([x, y], pad = 0) => x > -pad && x < 1000 + pad && y > -pad && y < 1000 + pad;
+
+  // region (clade) labels: big and faint, larger clades win collisions
+  const taken = [];
+  const rl = [];
+  internal.filter(n => n.depth > 0).sort((a, b) => b.area - a.area).forEach(n => {
+    const A = n.area * s2;
+    if (A < 16000 || A > 260000) return;
+    const p = P(n.centroid);
+    if (!inView(p)) return;
+    const fs = unit(Math.max(11, Math.min(26, Math.sqrt(A) / 12)));
+    const w = n.data.name.length * fs * 0.72, h = fs * 1.2;
+    const box = [p[0] - w / 2, p[1] - h / 2, p[0] + w / 2, p[1] + h / 2];
+    if (taken.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) return;
+    taken.push(box);
+    rl.push({ n, p, fs });
+  });
+  d3.select("#rlabels").selectAll("text").data(rl, d => d.n.data.name).join("text")
+    .attr("class", "rlabel").attr("x", d => d.p[0]).attr("y", d => d.p[1])
+    .style("font-size", d => d.fs + "px").style("letter-spacing", d => (d.fs * 0.12) + "px")
+    .text(d => d.n.data.name);
+
+  // leaf labels: scientific name, plus common name when there is room
+  const ll = [];
+  leaves.forEach(n => {
+    const A = n.area * s2;
+    if (A < 1500) return;
+    const p = P(n.centroid);
+    if (!inView(p, 40)) return;
+    const pxfs = Math.max(10.5, Math.min(16, Math.sqrt(A) / 7));
+    const room = Math.sqrt(A) * 1.35;
+    if (n.data.name.length * pxfs * 0.55 > room) return;
+    const showCommon = A > 6000 && n.data.common.length * pxfs * 0.46 < room;
+    ll.push({ n, p, fs: unit(pxfs), showCommon });
+  });
+  d3.select("#llabels").selectAll("text").data(ll, d => d.n.data.name).join(
+    enter => {
+      const t = enter.append("text").attr("class", "llabel");
+      t.append("tspan").attr("class", "ln");
+      t.append("tspan").attr("class", "lc");
+      return t;
+    })
+    .attr("x", d => d.p[0]).attr("y", d => d.p[1])
+    .style("stroke-width", d => unit(3) + "px")
+    .each(function (d) {
+      const t = d3.select(this);
+      t.select(".ln").attr("x", d.p[0]).attr("dy", d.showCommon ? -d.fs * 0.15 : d.fs * 0.35)
+        .style("font-size", d.fs + "px").text(d.n.data.name);
+      t.select(".lc").attr("x", d.p[0]).attr("dy", d.showCommon ? d.fs * 1.15 : 0)
+        .style("font-size", (d.fs * 0.82) + "px").text(d.showCommon ? d.n.data.common : "");
+    });
+
+  // tree skeleton
+  const showBranches = document.getElementById("t-branches").checked;
+  const edges = showBranches ? nodes.filter(n => n.parent) : [];
+  d3.select("#branches").selectAll("line").data(edges, n => n.data.name).join("line")
+    .attr("class", "branch")
+    .attr("x1", n => P(n.parent.centroid)[0]).attr("y1", n => P(n.parent.centroid)[1])
+    .attr("x2", n => P(n.centroid)[0]).attr("y2", n => P(n.centroid)[1])
+    .style("stroke-width", n => unit(0.6 + ageW(n.parent.data.age) * 0.6) + "px");
+  d3.select("#branches").selectAll("circle").data(showBranches ? nodes : [], n => n.data.name).join("circle")
+    .attr("class", "bnode")
+    .attr("cx", n => P(n.centroid)[0]).attr("cy", n => P(n.centroid)[1])
+    .attr("r", n => unit(n.children ? 3.5 : 2));
+
+  renderRoute();
+}
+
+// ---------- hover + breadcrumbs (explore)
+const hil = d3.select("#hilite");
+const circleD = "M" + clip.join("L") + "Z";
+let pinned = null;
+function highlight(n, strong) {
+  hil.selectAll("*").remove();
+  if (!n) return;
+  if (strong) hil.append("path").attr("class", "dim").attr("d", circleD + n.pathD);
+  hil.append("path").attr("class", "hi").attr("d", n.pathD).style("stroke-width", strong ? "3px" : "2.5px");
+}
+function showCrumbs(leaf) {
+  const ul = d3.select("#crumbs");
+  document.getElementById("crumb-hint").hidden = !!leaf;
+  const chain = leaf ? leaf.ancestors().reverse() : [];
+  ul.selectAll("li").data(chain, n => n.data.name).join("li")
+    .attr("class", n => n.children ? null : "leaf")
+    .style("padding-left", n => (6 + Math.min(n.depth, 12) * 3) + "px")
+    .html(n => `<span class="n">${n.data.name}</span><span class="c">${n.data.common}</span>` +
+      `<span class="a">${n.children ? "~" + n.data.age + " Mya" : ""}</span>`)
+    .on("mouseenter", (e, n) => highlight(n, true))
+    .on("mouseleave", () => highlight(pinned || null, false))
+    .on("click", (e, n) => zoomTo(n));
+}
+cellSel
+  .on("pointerenter", (e, n) => { if (mode === "explore" && !pinned) { highlight(n); showCrumbs(n); } })
+  .on("pointerleave", () => { if (mode === "explore" && !pinned) { highlight(null); showCrumbs(null); } })
+  .on("click", (e, n) => {
+    if (mode === "explore") {
+      pinned = pinned === n ? null : n;
+      highlight(pinned || n); showCrumbs(pinned || n);
+    } else placeGuess(e, n);
+  });
+
+// ---------- guess round
+let mode = "explore", round = 0, target = null, guess = null;
+function setMode(m) {
+  mode = m;
+  document.body.classList.toggle("guessing", m === "guess");
+  document.getElementById("tab-explore").setAttribute("aria-pressed", m === "explore");
+  document.getElementById("tab-guess").setAttribute("aria-pressed", m === "guess");
+  document.getElementById("explore-panel").hidden = m !== "explore";
+  document.getElementById("guess-panel").hidden = m !== "guess";
+  pinned = null; highlight(null); showCrumbs(null);
+  if (m === "guess") newRound(); else { guess = null; renderRoute(); }
+}
+document.getElementById("tab-explore").onclick = () => setMode("explore");
+document.getElementById("tab-guess").onclick = () => setMode("guess");
+document.getElementById("next").onclick = () => { round++; newRound(); };
+
+function newRound() {
+  const m = MYSTERY[round % MYSTERY.length];
+  target = { common: m[0], species: m[1], leaf: byName.get(m[2]) };
+  guess = null;
+  document.getElementById("m-common").textContent = target.common;
+  document.getElementById("m-species").textContent = target.species;
+  document.getElementById("result").hidden = true;
+  document.getElementById("guess-hint").hidden = false;
+  document.getElementById("scorebar").style.width = "0";
+  highlight(null);
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  renderRoute();
+}
+
+function mrca(a, b) {
+  const anc = new Set(a.ancestors());
+  return b.ancestors().find(n => anc.has(n));
+}
+function scoreFor(common, same) {
+  if (same) return 5000;
+  const t = 1 - Math.log(common.data.age / 20) / Math.log(750 / 20);
+  return Math.round(5000 * Math.max(0, Math.min(1, t)));
+}
+function placeGuess(e, leaf) {
+  if (guess) return;
+  const pt = T.invert(d3.pointer(e, svg.node()));
+  const same = leaf === target.leaf;
+  const anc = mrca(leaf, target.leaf);
+  guess = { leaf, pt, anc, same };
+  const sc = scoreFor(anc, same);
+  document.getElementById("score").innerHTML = `${sc.toLocaleString("en-US")} <span>/ 5,000</span>`;
+  document.getElementById("scorebar").style.width = (sc / 50) + "%";
+  document.getElementById("r-guess").textContent = `${leaf.data.name} (${leaf.data.common})`;
+  document.getElementById("r-answer").textContent = `${target.leaf.data.name} (${target.leaf.data.common})`;
+  document.getElementById("r-mrca").textContent = same
+    ? "Same group"
+    : `${anc.data.name}, ~${anc.data.age} million years ago`;
+  document.getElementById("result").hidden = false;
+  document.getElementById("guess-hint").hidden = true;
+  hil.selectAll("*").remove();
+  if (!same) hil.append("path").attr("class", "mrca").attr("d", anc.pathD);
+  renderRoute();
+  zoomTo(anc);
+}
+
+// path from the guess up to the shared ancestor and back down to the answer
+function renderRoute() {
+  const route = d3.select("#route"), pins = d3.select("#pins");
+  if (!guess) { route.selectAll("*").remove(); pins.selectAll("*").remove(); return; }
+  const up = guess.leaf.ancestors().slice(0, guess.leaf.ancestors().indexOf(guess.anc) + 1);
+  const down = target.leaf.ancestors().slice(0, target.leaf.ancestors().indexOf(guess.anc)).reverse();
+  const chain = [guess.pt, ...up.slice(1).map(n => n.centroid), ...down.slice(0, -1).map(n => n.centroid), target.leaf.centroid];
+  const pts = (guess.same ? [guess.pt, target.leaf.centroid] : chain).map(P);
+  route.selectAll("path").data([pts]).join("path").attr("class", "path")
+    .attr("d", d => "M" + d.join("L")).style("stroke-width", unit(3) + "px");
+  route.selectAll("circle").data(guess.same ? [] : [...up.slice(1), ...down.slice(0, -1)])
+    .join("circle").attr("class", "pathnode")
+    .attr("cx", n => P(n.centroid)[0]).attr("cy", n => P(n.centroid)[1])
+    .attr("r", n => unit(n === guess.anc ? 6 : 3.5));
+  const pinData = [
+    { p: P(guess.pt), c: "var(--guess)" },
+    { p: P(target.leaf.centroid), c: "var(--answer)" },
+  ];
+  pins.selectAll("g").data(pinData).join(enter => {
+    const g = enter.append("g");
+    g.append("path"); g.append("circle");
+    return g;
+  }).each(function (d) {
+    const g = d3.select(this), u = unit(1);
+    g.attr("transform", `translate(${d.p[0]},${d.p[1]}) scale(${u})`);
+    g.select("path").attr("d", "M0,0 C-3,-8 -10,-12 -10,-20 A10,10 0 1 1 10,-20 C10,-12 3,-8 0,0Z")
+      .style("fill", d.c).style("stroke", "var(--surface)").style("stroke-width", 1.5);
+    g.select("circle").attr("cy", -20).attr("r", 3.5).style("fill", "var(--surface)");
+  });
+}
+
+document.getElementById("t-branches").onchange = renderOverlay;
+document.getElementById("t-borders").onchange = paintBorders;
+document.getElementById("t-colour").onchange = paintCells;
+new ResizeObserver(renderOverlay).observe(svg.node());
+renderOverlay();
+</script>
+</body>
+</html>

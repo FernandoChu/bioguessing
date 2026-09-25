@@ -1,0 +1,9 @@
+# Cache headers for hosts that read this file (Cloudflare Pages, Netlify). GitHub Pages ignores it.
+/sw.js
+  Cache-Control: no-cache
+/data/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=604800
+/shared/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=604800
+/*.html
+  Cache-Control: public, max-age=300, stale-while-revalidate=604800
