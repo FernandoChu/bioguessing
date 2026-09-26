@@ -20,6 +20,16 @@ is a file in `shared/games/` that calls `BG.registerGame(...)` (see the comment 
   how long ago your pick and the answer shared an ancestor.
 - **Closest relatives** (`trio.js`): three species, pick the two most closely related. The reveal
   opens the clade where all three meet and highlights the pair's clade.
+- **Hot and cold** (`hotcold.js`): find a hidden species; each guess says how long ago it shared an
+  ancestor with the answer, and the map closes in on the smallest clade known to contain it.
+- **When did they split?** (`split.js`): two species, guess when their lineages separated on a
+  logarithmic time slider; the guess is drawn as a ring on the map.
+- **Which clade?** (`whichclade.js`): a photo and four non-overlapping groups, at three levels.
+- **Build the tree** (`build.js`): four species, join the closest groups step by step, then compare
+  your tree with the real one.
+
+`shared/games/common.js` has helpers the games share (weighted picks, species cards, the
+"Species from" menu).
 
 Everything is static: plain HTML and JavaScript, with d3 and fonts from public CDNs. A service
 worker (`sw.js`) caches the site and recently viewed photos in the browser, so repeat visits

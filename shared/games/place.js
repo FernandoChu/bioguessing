@@ -137,7 +137,7 @@
 
     enter() {
       // play within whatever clade is being viewed
-      const current = ctx.view.root ? ctx.view.root() : BG.root;
+      const current = ctx.startRoot();
       setFilter(current);
       ctx.cladeMenu($("pa-clade"), current, n => { setFilter(n); newRound(); });
       newRound();

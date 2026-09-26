@@ -72,6 +72,8 @@ aside{display:flex;flex-direction:column;gap:14px}
 .crumbs .a{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .crumbs li:last-child .n{color:var(--accent)}
 .hint{color:var(--muted);font-size:13.5px;margin:0}
+.hint.warm{color:var(--answer)}
+.hint.good{color:var(--good)}
 .legend{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .legend b{font-weight:600}
 .photo{border:1.5px dashed var(--line);border-radius:8px;padding:18px 14px;text-align:center;display:flex;flex-direction:column;gap:2px}
@@ -142,6 +144,48 @@ aside{display:flex;flex-direction:column;gap:14px}
 .hl-area.pair{fill:var(--good-soft);stroke:var(--good)}
 .hl-line.alt{stroke:var(--answer)}
 .hl-line.pair{stroke:var(--good)}
+.hl-ring{fill:none;stroke:var(--accent)}
+.hl-ring.pair{stroke:var(--good)}
+.hl-ring.answer{stroke:var(--answer)}
+.hl-ring-label{fill:var(--accent);font-family:var(--sans);font-weight:700;dominant-baseline:central}
+.hl-ring-label.pair{fill:var(--good)}
+.hl-ring-label.answer{fill:var(--answer)}
+.hl-area.wrong{fill:var(--answer-soft);stroke:var(--answer)}
+.hl-area.hint{fill:var(--accent-soft);stroke:var(--accent);stroke-dasharray:6 4}
+.pin.warm path{fill:var(--answer)}
+.pin.cold path{fill:var(--muted)}
+/* game widgets */
+.searchrow{display:flex;gap:6px}
+.searchrow input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.guesses{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.guesses li{display:grid;grid-template-columns:22px 1fr auto;gap:6px;align-items:baseline;padding:4px 6px;border-radius:6px;background:var(--bg)}
+.guesses li.best{background:var(--answer-soft)}
+.guesses li.win{background:var(--good-soft)}
+.guesses .no{color:var(--muted);font-variant-numeric:tabular-nums}
+.guesses .where{color:var(--muted);font-size:12.5px;grid-column:2/-1}
+.guesses .age{font-variant-numeric:tabular-nums;font-weight:700}
+.slider{display:flex;flex-direction:column;gap:4px}
+.slider input{width:100%;accent-color:var(--accent)}
+.slider output{font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.options{display:flex;flex-direction:column;gap:6px}
+.options button{text-align:left;display:flex;flex-direction:column;gap:1px;padding:8px 12px}
+.options button span{color:var(--muted);font-size:13px}
+.options button.right{border-color:var(--good);background:var(--good-soft);box-shadow:inset 0 0 0 2px var(--good)}
+.options button.wrong{border-color:var(--answer);background:var(--answer-soft);box-shadow:inset 0 0 0 2px var(--answer)}
+.seg{display:inline-grid;grid-auto-flow:column;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:6px 12px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:6px 10px;font-weight:600}
+.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.cladograms{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cladograms figure{margin:0;display:flex;flex-direction:column;gap:4px}
+.cladograms figcaption{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cladograms svg{width:100%;height:auto;display:block}
+.cladograms .edge{stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round}
+.cladograms .edge.ok{stroke:var(--good)}
+.cladograms .edge.bad{stroke:var(--answer)}
+.cladograms text{fill:var(--ink);font:700 13px var(--sans);dominant-baseline:central}
 .pin.pair path{fill:var(--good)}
 .trio{display:flex;flex-direction:column;gap:8px}
 .trio .card{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;text-align:left;padding:6px;border-radius:8px}

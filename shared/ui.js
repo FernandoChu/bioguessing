@@ -71,9 +71,10 @@
 
   BG.init = function (view, opts = {}) {
     const $ = id => document.getElementById(id);
-    const S = { mode: "explore", pinned: null, hovered: null, game: games[0] || null };
+    const S = { mode: "explore", pinned: null, hovered: null, game: games[0] || null, playRoot: BG.root };
     BG.state = S;
-    const ctx = { view, $, esc, label, source, credit, cladeMenu };
+    // games start in the clade that was open in Explore, not wherever the previous game left the map
+    const ctx = { view, $, esc, label, source, credit, cladeMenu, startRoot: () => S.playRoot };
 
     // ---- mode switch, in the page header
     $("modes").innerHTML = `
@@ -284,6 +285,7 @@
       view.reveal(null);
       view.select(null);
       view.highlight(null);
+      if (m === "play") S.playRoot = view.root ? view.root() : BG.root;
       if (m === "play" && S.game) chooseGame(S.game);
     }
     $("mode-explore").onclick = () => setMode("explore");

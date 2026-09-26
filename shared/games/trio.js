@@ -189,7 +189,7 @@
     },
 
     enter() {
-      const current = ctx.view.root ? ctx.view.root() : BG.root;
+      const current = ctx.startRoot();
       setFilter(current);
       ctx.cladeMenu($("tr-clade"), current, n => { setFilter(n); newQuestion(); });
       newQuestion();

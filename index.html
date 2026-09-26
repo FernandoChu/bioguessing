@@ -45,8 +45,13 @@
 <script src="data/tree.js"></script>
 <script src="shared/data.js"></script>
 <script src="shared/ui.js"></script>
+<script src="shared/games/common.js"></script>
 <script src="shared/games/place.js"></script>
 <script src="shared/games/trio.js"></script>
+<script src="shared/games/hotcold.js"></script>
+<script src="shared/games/split.js"></script>
+<script src="shared/games/whichclade.js"></script>
+<script src="shared/games/build.js"></script>
 <script>
 const { root, nodes, leaves } = BG;
 const svg = d3.select("#svg");
@@ -78,8 +83,8 @@ const gEra = layer("eras"), gArea = layer("areas"), gWedge = layer("wedges"), gB
 
 let T = d3.zoomIdentity, px = 0.7, showEras = true;
 let hoverN = null, selN = null, result = null;
-// Marks a game can put on the map: { areas: [{node, strong}], routes: [{from, to, via, alt}],
-// pins: [{node, kind, label}] }. Shown instead of hover and selection while set.
+// Marks a game can put on the map: { areas: [{node, strong, kind}], routes: [{from, to, via, alt, kind}],
+// pins: [{node, kind, label}], rings: [{age, kind, label}] }. Shown instead of hover and selection while set.
 let marks = null;
 // geometry of the current frame
 let c = [C, C], k = 1, s = 0.7;
@@ -234,7 +239,7 @@ function routeUp(n, top) {
 const polyD = pts => "M" + pts.map(f2).join("L");
 
 function drawMarks() {
-  const areas = [], lines = [], pins = [];
+  const areas = [], lines = [], pins = [], rings = [];
   const area = (n, w) => { if (n.children && inView(n)) areas.push({ d: sectorD(v0(n), v1(n), rt(n.age), rOut), w }); };
   const addFocus = (n, strong) => {
     if (!inView(n)) return;
@@ -250,6 +255,7 @@ function drawMarks() {
       const pts = routeUp(m.from, m.via).concat(routeUp(m.to, m.via).reverse());
       lines.push({ d: polyD(pts), w: 3.2, alt: m.alt, kind: m.kind });
     });
+    (marks.rings || []).forEach(m => { if (m.age <= V.tmax) rings.push({ r: rt(m.age), kind: m.kind, label: m.label }); });
     (marks.pins || []).forEach(m => {
       if (!inView(m.node)) return;
       const p = P(angOf(m.node), nodeR(m.node));
@@ -277,6 +283,14 @@ function drawMarks() {
     .style("stroke-width", d => u(d.w) + "px");
   gLine.selectAll("path").data(lines).join("path").attr("class", d => "hl-line" + (d.alt ? " alt" : "") + (d.kind ? " " + d.kind : "")).attr("d", d => d.d)
     .style("stroke-width", d => u(d.w) + "px");
+  gLine.selectAll("circle.hl-ring").data(rings).join("circle").attr("class", d => "hl-ring " + (d.kind || ""))
+    .attr("cx", c[0]).attr("cy", c[1]).attr("r", d => d.r * k).style("stroke-width", u(2.5) + "px")
+    .style("stroke-dasharray", `${u(6)} ${u(5)}`);
+  // ring labels sit in the gap at the top, where the period names are
+  gLine.selectAll("text.hl-ring-label").data(rings.filter(d => d.label)).join("text")
+    .attr("class", d => "hl-ring-label halo " + (d.kind || ""))
+    .attr("x", d => P(-Math.PI / 2 + GAP / 2 + 0.01, d.r)[0] + u(4)).attr("y", d => P(-Math.PI / 2 + GAP / 2 + 0.01, d.r)[1])
+    .style("font-size", u(11.5) + "px").style("stroke-width", u(3) + "px").text(d => d.label);
   BG.drawPins(gPin, pins, u(1));
 }
 
