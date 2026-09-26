@@ -3,13 +3,13 @@
 //   in the background (stale-while-revalidate). The first visit after a deploy may show the old
 //   data; bump VERSION when deploying to switch everyone over on their next load instead.
 // - Photos (iNaturalist, Wikimedia Commons): cache-first, keeping the most recent MAX_PHOTOS.
-const VERSION = "bg-v4";
+const VERSION = "bg-v5";
 const SHELL = `${VERSION}-shell`;
 const PHOTOS = "bg-photos";
 const MAX_PHOTOS = 400; // medium photos are ~100 KB, so about 40 MB at most
 
 const PRECACHE = [
-  "./", "index.html", "radial.html", "sunburst.html", "hyperbolic.html", "strip.html", "clade-atlas.html",
+  "./", "index.html",
   "shared/style.css", "shared/data.js", "shared/ui.js", "data/tree.js",
   "https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js",
 ];

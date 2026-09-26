@@ -31,10 +31,6 @@ header{display:flex;flex-direction:column;gap:10px}
 .eyebrow{margin:0;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
 h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .lede{margin:0;color:var(--muted);max-width:70ch;text-wrap:pretty}
-nav{display:flex;flex-wrap:wrap;gap:6px}
-nav a{color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:600;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
-nav a:hover{border-color:var(--muted)}
-nav a[aria-current="page"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
 @media (max-width:860px){.layout{grid-template-columns:1fr}}
 .stage{position:relative;width:100%;max-width:880px;min-width:0;justify-self:center}

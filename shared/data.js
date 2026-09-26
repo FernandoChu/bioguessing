@@ -1,4 +1,4 @@
-// Shared tree data and helpers for the BioGuessing prototypes.
+// Tree data and helpers for BioGuessing.
 // Internal nodes: N(name, common name, crown age in Mya, children). Leaves: L(name, common name, ~species).
 (function () {
   const N = (name, common, age, children) => ({ name, common, age, children });

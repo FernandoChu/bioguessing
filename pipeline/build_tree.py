@@ -34,7 +34,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / "cache" / "http"
 OUT_DIR = HERE.parent / "data"
-USER_AGENT = "BioGuessing-pipeline/0.1 (educational tree-of-life game prototype)"
+USER_AGENT = "BioGuessing-pipeline/0.1 (educational tree-of-life game)"
 LICENSES = "cc0,cc-by,cc-by-nc"
 
 # (iNaturalist group name or alternatives, number of species). Roughly 1,000 in total.

@@ -1,26 +1,10 @@
-// Shared side panel and game round for the BioGuessing prototypes.
+// Side panel and game rounds for BioGuessing.
 // A view passes an object with highlight(node), select(node), focus(node), reveal(result|null), reset()
 // and reports pointer activity back through BG.hover(node) and BG.click(node).
 (function () {
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
-
-  const PAGES = [
-    ["index.html", "Overview"],
-    ["radial.html", "Radial time tree"],
-    ["sunburst.html", "Sunburst"],
-    ["hyperbolic.html", "Hyperbolic"],
-    ["strip.html", "Time strip"],
-    ["clade-atlas.html", "Voronoi (first try)"],
-  ];
-
-  BG.nav = function (current) {
-    const nav = document.getElementById("nav");
-    if (!nav) return;
-    nav.innerHTML = PAGES.map(([href, label]) =>
-      `<a href="${href}"${href === current ? ' aria-current="page"' : ""}>${label}</a>`).join("");
-  };
 
   BG.pxPerUnit = svgNode => (svgNode.getBoundingClientRect().width || 700) / 1000;
 

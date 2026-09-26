@@ -4,15 +4,13 @@ A GeoGuessr-style game for the tree of life: you see a photo of an animal and pl
 time-calibrated tree of about 1,000 species. The score depends on how long ago your guess and
 the answer shared an ancestor.
 
-Play: https://fernandochu.github.io/bioguessing/radial.html
+Play: https://fernandochu.github.io/bioguessing/
 
-## Pages
+## How it works
 
-| Page | What it is |
-|---|---|
-| `radial.html` | The main view: angle is lineage, distance from the centre is time. Clades too small to draw appear as wedges that open as you zoom. |
-| `index.html` | Overview of the layouts that were tried. |
-| `sunburst.html`, `hyperbolic.html`, `strip.html`, `clade-atlas.html` | Earlier layout prototypes, on a 55-group demo tree. |
+`index.html` draws the tree radially: angle is lineage and distance from the centre is time.
+Double-click a clade to open it across the whole circle; rounds can be limited to one clade.
+Extinct animals from the Mesozoic onward can be switched on or off.
 
 Everything is static: plain HTML and JavaScript, with d3 and fonts from public CDNs. A service
 worker (`sw.js`) caches the site and recently viewed photos in the browser, so repeat visits
