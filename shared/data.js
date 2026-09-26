@@ -163,12 +163,32 @@
   function fromCompact(o) {
     // clades without a formal name carry a descriptive label ("Strigiformes + Accipitriformes")
     const n = { name: o.n, label: o.lb, common: o.c || o.lc || "", age: o.a, est: !!o.est, aliases: o.al || [], ott: o.ott, total: o.t };
-    if (o.k) n.children = o.k.map(fromCompact);
+    if (o.k) Object.assign(n, { children: o.k.map(fromCompact), age0: o.a0 });
     else Object.assign(n, { inat: o.inat, obs: o.obs, photos: o.ph || [] });
+    if (o.x) Object.assign(n, { extinct: true, fa: o.x[0], la: o.x[1] });
     return n;
   }
   const REAL = !!(window.BG_TREE && window.BG_TREE.tree);
-  const SOURCE = REAL ? fromCompact(window.BG_TREE.tree) : TREE;
+  const FULL = REAL ? fromCompact(window.BG_TREE.tree) : TREE;
+
+  // Extinct animals can be switched off; the choice is remembered in this browser.
+  const EXTINCT_KEY = "bg-show-extinct";
+  let showExtinct = true;
+  try { showExtinct = localStorage.getItem(EXTINCT_KEY) !== "0"; } catch (e) { /* storage unavailable */ }
+  const hasExtinct = (function any(n) { return n.extinct || (n.children || []).some(any); })(FULL);
+  // Without fossils: drop them, collapse clades left with one child, and use the living-only ages.
+  function pruneExtinct(n) {
+    if (!n.children) return n.extinct ? null : n;
+    const kids = n.children.map(pruneExtinct).filter(Boolean);
+    if (!kids.length) return null;
+    if (kids.length === 1) return kids[0];
+    return { ...n, children: kids, age: n.age0 != null ? n.age0 : n.age };
+  }
+  const SOURCE = showExtinct || !hasExtinct ? FULL : pruneExtinct(FULL);
+  function setShowExtinct(v) {
+    try { localStorage.setItem(EXTINCT_KEY, v ? "1" : "0"); } catch (e) { /* storage unavailable */ }
+    location.reload();
+  }
 
   const rootAge = SOURCE.age || 700;
   const MAX_AGE = Math.max(720, Math.ceil(rootAge * 1.04));
@@ -179,7 +199,7 @@
 
   const root = d3.hierarchy(SOURCE).sum(d => d.children ? 0 : d.species ? 1 + Math.log10(d.species + 1) : 1);
   root.each(n => {
-    n.age = n.children ? n.data.age : 0;
+    n.age = n.children ? n.data.age : n.data.extinct ? n.data.la : 0;
     n.unnamed = !n.data.name;
     const named = n.ancestors().find(a => a.data.name);
     n.name = n.data.name || n.data.label || (named ? `Unnamed clade in ${named.data.name}` : "Unnamed clade");
@@ -234,12 +254,18 @@
   }
 
   const fmtAge = a => a >= 10 ? String(Math.round(a)) : a.toFixed(1);
+  // 83.6 -> "83.6 million years ago", 0.0117 -> "12 thousand years ago"
+  const fmtAgo = a => a >= 1 ? `${fmtAge(a)} million years ago` : `${Math.max(1, Math.round(a * 1000))} thousand years ago`;
+  const livedText = n => !n.data.extinct ? "" : n.data.la < 0.012
+    ? `Lived from ${fmtAgo(n.data.fa)} until historical times`
+    : `Lived ${n.data.fa >= 1 && n.data.la >= 1 ? `${fmtAge(n.data.fa)}–${fmtAge(n.data.la)} million years ago` : `from ${fmtAgo(n.data.fa)} to ${fmtAgo(n.data.la)}`}`;
   // 287458 -> "287k", 9328 -> "9.3k", 412 -> "412"
   const fmtCount = c => c >= 1e6 ? (c / 1e6).toFixed(1).replace(/\.0$/, "") + "M"
     : c >= 1e4 ? Math.round(c / 1e3) + "k" : c >= 1e3 ? (c / 1e3).toFixed(1).replace(/\.0$/, "") + "k" : String(c);
 
   window.BG = {
-    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount,
+    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount, livedText,
+    showExtinct, hasExtinct, setShowExtinct,
     REAL, meta: REAL ? window.BG_TREE.meta : null, leafNoun: REAL ? "species" : "groups",
   };
 })();

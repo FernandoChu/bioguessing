@@ -79,7 +79,8 @@ function ringD(r0, r1) {
   const one = r => { const R = (r * k).toFixed(1); return `M${c[0] + r * k},${c[1]}A${R},${R} 0 1 1 ${c[0] - r * k},${c[1]}A${R},${R} 0 1 1 ${c[0] + r * k},${c[1]}Z`; };
   return one(r1) + one(r0);
 }
-const nodeR = n => n.children ? rt(n.age) : rOut;
+// extinct species end at their last appearance instead of at today's rim
+const nodeR = n => n.children ? rt(n.age) : n.data.extinct ? rt(n.data.la) : rOut;
 
 function render() {
   px = BG.pxPerUnit(svg.node());
@@ -128,13 +129,22 @@ function render() {
   shown.forEach(n => {
     const r0 = n.parent ? rt(n.parent.age) : rIn;
     segs.push({ key: "s" + n.name, h: n.hue, d: "M" + f2(P(n.ang, r0)) + "L" + f2(P(n.ang, nodeR(n))), w: 1.7 });
+    if (!n.children && n.data.extinct && nodeR(n) < rOut - 1) {
+      segs.push({ key: "g" + n.name, ghost: true, d: "M" + f2(P(n.ang, nodeR(n))) + "L" + f2(P(n.ang, rOut)), w: 1 });
+    }
     if (n.open) {
       const a = n.children[0].ang, b = n.children[n.children.length - 1].ang;
       segs.push({ key: "a" + n.name, h: n.hue, d: arcD(rt(n.age), a, b), w: 1.7 });
     }
   });
-  gBranch.selectAll("path").data(segs, d => d.key).join("path").attr("class", "stroke-h")
-    .attr("style", d => `--h:${d.h.toFixed(1)}`).attr("d", d => d.d).style("stroke-width", d => u(d.w) + "px");
+  gBranch.selectAll("path").data(segs, d => d.key).join("path").attr("class", d => d.ghost ? "ghost" : "stroke-h")
+    .attr("style", d => d.ghost ? null : `--h:${d.h.toFixed(1)}`).attr("d", d => d.d)
+    .style("stroke-width", d => u(d.w) + "px").style("stroke-dasharray", d => d.ghost ? `${u(1)} ${u(4)}` : null);
+  // a dagger where each extinct lineage ends
+  const ends = shown.filter(n => !n.children && n.data.extinct && (n.a1 - n.a0) * rOut * s >= 6);
+  gBranch.selectAll("text.dagger").data(ends, n => n.name).join("text").attr("class", "dagger eralabel")
+    .attr("x", n => P(n.ang, nodeR(n) + 6)[0]).attr("y", n => P(n.ang, nodeR(n) + 6)[1])
+    .style("font-size", u(11) + "px").text("†");
   gBranch.selectAll("circle").data(shown.filter(n => n.open), n => n.name).join("circle").attr("class", "dot-h")
     .attr("style", n => `--h:${n.hue.toFixed(1)}`)
     .attr("cx", n => P(n.ang, rt(n.age))[0]).attr("cy", n => P(n.ang, rt(n.age))[1]).attr("r", u(2.6));
@@ -155,7 +165,8 @@ function render() {
     .style("stroke-width", u(3) + "px")
     .each(function (n) {
       const t = d3.select(this), roomy = (n.a1 - n.a0) * rOut * s >= 15;
-      t.select(".n").classed("sp", BG.REAL && !n.children).style("font-size", u(12) + "px").text(n.name);
+      t.select(".n").classed("sp", BG.REAL && !n.children).style("font-size", u(12) + "px")
+        .text((n.data.extinct ? "† " : "") + n.name);
       t.select(".c").style("font-size", u(11) + "px")
         .text(n.children
           ? (n.data.total ? `  ~${BG.fmtCount(n.data.total)} species` : `  +${n.nLeaves} ${BG.leafNoun}`)
@@ -273,12 +284,17 @@ BG.init({
   reveal(res) { result = res; drawMarks(); if (res) focus(res.anc); },
   reset() { svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity); },
 }, {
-  controls: [{ id: "t-eras", label: "Show geological periods", checked: true, onchange: v => { showEras = v; render(); } }],
+  controls: [
+    { id: "t-eras", label: "Show geological periods", checked: true, onchange: v => { showEras = v; render(); } },
+    ...(BG.hasExtinct ? [{ id: "t-extinct", label: "Include extinct animals (†)", checked: BG.showExtinct,
+      onchange: v => BG.setShowExtinct(v) }] : []),
+  ],
   about: `<ol class="legend">
     <li><b>Angle is lineage.</b> Every clade is one continuous slice, so rim neighbours are related at exactly the split where their branches meet.</li>
     <li><b>Radius is time.</b> The centre is about 720 million years ago and the rim is today, on a square-root scale. The rings are geological periods.</li>
     <li><b>Zoom opens wedges.</b> A shaded wedge is a clade too small to draw at this zoom. Zoom in and it opens into its subclades.</li>
     <li><b>Picking:</b> click near the rim for a specific group, or further in along a branch for an older, broader lineage.</li>
+    ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. Turning them off also hides them from rounds.</li>` : ""}
   </ol>
   <p class="hint">${BG.REAL
     ? `${BG.leaves.length.toLocaleString("en-US")} species. Tree from the Open Tree of Life, dates from TimeTree (some interpolated), photos from iNaturalist. Built ${BG.meta.built}.`

@@ -23,6 +23,7 @@ Delete the cache to refresh everything.
 | Clade names | iNaturalist taxonomy, then Wikidata (P9157 → P1843) | A clade takes the iNaturalist name covering exactly the same sampled species (standard ranks preferred). Clades with no formal name get a label from their two largest subgroups (`lb`, `lc`). Wikidata is skipped if it is unavailable. |
 | Species totals | Open Tree `tree_of_life/node_info` | `num_tips` of the clade in the full synthetic tree, i.e. all species, not just the sampled ones. |
 | Dates | TimeTree `api/taxon/{name}`, then `api/pairwise/{ncbi}/{ncbi}` | Named clades use the median of the published crown-age estimates TimeTree lists. Other splits use the pairwise time between one species on each side. Splits with no data, or whose date conflicts with the topology, are interpolated (`est: 1`). |
+| Extinct species | `EXTINCT` list, Paleobiology Database, Wikipedia / Wikimedia Commons | Famous extinct animals whose first appearance is in the Mesozoic or later. Time ranges from PBDB; pictures are the lead image of the species' Wikipedia article, kept only with a CC0, public-domain, CC-BY or CC-BY-SA license. Placed by hand (`FOSSIL_IN`, `FOSSIL_STEM`) because Open Tree places many fossils badly. A fossil's branch ends at its last appearance; the split it joins is at least as old as its first appearance (or its extinct genus's or family's). Fossil clade ages come from `FOSSIL_CLADE_AGE`. The tree is also dated without fossils (`a0`) for when the page hides them. |
 | Photos | iNaturalist observations | Up to 3 per species from different observations, each with its license, attribution and observation link. |
 
 ## Output format
@@ -32,6 +33,8 @@ Delete the cache to refresh everything.
 node = { n: name|null, a: age in Mya, ott, al: [aliases], c: common name,
          est: 1 if the age is interpolated,
          t: total species in the clade, lb / lc: descriptive label when there is no name,
+         a0: the clade's age when extinct species are hidden (only where it differs),
+         x: [first, last appearance in Mya] for extinct species,
          k: [children]                        // clades only
          inat, obs, ph: [{u, a, l, o}] }      // species only: photo url, attribution, license, observation
 ```

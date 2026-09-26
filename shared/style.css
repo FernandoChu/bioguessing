@@ -80,6 +80,7 @@ aside{display:flex;flex-direction:column;gap:14px}
 .exphoto figcaption{display:flex;flex-direction:column}
 .exphoto strong{font-family:var(--serif);font-weight:600;font-size:17px}
 .exphoto em{font-family:var(--serif);color:var(--muted)}
+.exphoto .lived{font-size:13.5px;color:var(--answer);font-weight:600}
 .exphoto small{color:var(--muted);font-size:12px;margin-top:4px;overflow-wrap:anywhere}
 .exphoto small a,.photo small a{color:var(--accent)}
 .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;align-items:center}
@@ -114,6 +115,7 @@ aside{display:flex;flex-direction:column;gap:14px}
 .hl-area{fill:var(--accent-soft);stroke:var(--accent);pointer-events:none}
 .hl-line{stroke:var(--accent);fill:none;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .hl-dot{fill:var(--accent);pointer-events:none}
+.ghost{stroke:var(--muted);fill:none;opacity:.55;stroke-linecap:round}
 .pin{pointer-events:none}
 .pin path{stroke:var(--surface);stroke-width:1.5}
 .pin.guess path{fill:var(--guess)}

@@ -52,6 +52,7 @@
           <figcaption>
             <strong id="ex-common"></strong>
             <em id="ex-sci"></em>
+            <span class="lived" id="ex-lived" hidden></span>
             <small id="ex-credit"></small>
           </figcaption>
         </figure>
@@ -96,7 +97,8 @@
 
     const S = { mode: "explore", pinned: null, hovered: null, selected: null, round: 0, target: null, result: null };
     BG.state = S;
-    const label = n => n.data.common ? `${n.name} (${n.data.common})` : n.name;
+    const label = n => (n.data.extinct ? "† " : "") + (n.data.common ? `${n.name} (${n.data.common})` : n.name);
+    const source = ph => /wikimedia/.test(ph.o || "") ? "Wikimedia Commons" : "iNaturalist";
     const esc = t => String(t).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
 
     function crumbs(n) {
@@ -110,7 +112,7 @@
         li.innerHTML = `<span class="n"></span><span class="c"></span><span class="a"></span>`;
         li.children[0].textContent = a.name;
         li.children[1].textContent = a.data.common;
-        li.children[2].textContent = a.children ? `~${BG.fmtAge(a.age)} Mya` : "";
+        li.children[2].textContent = a.children ? `~${BG.fmtAge(a.age)} Mya` : a.data.extinct ? "† extinct" : "";
         if (a.unnamed) li.style.opacity = ".65";
         const tip = [];
         if (a.data.total) tip.push(`About ${a.data.total.toLocaleString("en-US")} species in total, ${a.nLeaves} on this map`);
@@ -142,7 +144,9 @@
         $("ex-img").style.cursor = photos.length > 1 ? "pointer" : "";
         $("ex-common").textContent = n.data.common || "";
         $("ex-sci").textContent = n.name;
-        $("ex-credit").innerHTML = `${esc(ph.a)} · <a href="${esc(ph.o)}" target="_blank" rel="noopener">View on iNaturalist</a>`;
+        $("ex-lived").textContent = n.data.extinct ? "† " + BG.livedText(n) : "";
+        $("ex-lived").hidden = !n.data.extinct;
+        $("ex-credit").innerHTML = `${esc(ph.a)} · <a href="${esc(ph.o)}" target="_blank" rel="noopener">View on ${source(ph)}</a>`;
         fig.hidden = false;
         return;
       }
@@ -216,7 +220,7 @@
       $("r-answer").textContent = label(res.answer);
       $("r-mrca").textContent = res.same ? "Exact match" : `${res.anc.name}, ~${BG.fmtAge(res.anc.age)} million years ago`;
       $("m-common").textContent = S.target.common;
-      $("m-species").textContent = S.target.species;
+      $("m-species").textContent = S.target.species + (S.target.leaf.data.extinct ? ` · † ${BG.livedText(S.target.leaf)}` : "");
       $("result").hidden = false;
       $("lock").hidden = true;
       view.highlight(null);
@@ -255,13 +259,13 @@
           img.hidden = true;
           $("m-common").textContent = S.target.common;
           $("m-species").textContent = S.target.species;
-          $("m-credit").innerHTML = `The photo could not load here. <a href="${esc(ph.o)}" target="_blank" rel="noopener">See it on iNaturalist</a>`;
+          $("m-credit").innerHTML = `The photo could not load here. <a href="${esc(ph.o)}" target="_blank" rel="noopener">See it on ${source(ph)}</a>`;
         };
         img.src = ph.u;
         img.hidden = false;
         $("m-common").textContent = "";
         $("m-species").textContent = "";
-        $("m-credit").innerHTML = `${esc(ph.a)} · <a href="${esc(ph.o)}" target="_blank" rel="noopener">iNaturalist</a>`;
+        $("m-credit").innerHTML = `${esc(ph.a)} · <a href="${esc(ph.o)}" target="_blank" rel="noopener">${source(ph)}</a>`;
       } else {
         img.hidden = true;
         $("m-common").textContent = S.target.common;

@@ -2,8 +2,8 @@
 // - Pages, scripts, styles, tree data, d3 and fonts: served from cache immediately and refreshed
 //   in the background (stale-while-revalidate). The first visit after a deploy may show the old
 //   data; bump VERSION when deploying to switch everyone over on their next load instead.
-// - iNaturalist photos: cache-first, keeping the most recent MAX_PHOTOS.
-const VERSION = "bg-v1";
+// - Photos (iNaturalist, Wikimedia Commons): cache-first, keeping the most recent MAX_PHOTOS.
+const VERSION = "bg-v2";
 const SHELL = `${VERSION}-shell`;
 const PHOTOS = "bg-photos";
 const MAX_PHOTOS = 400; // medium photos are ~100 KB, so about 40 MB at most
@@ -14,7 +14,7 @@ const PRECACHE = [
   "https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js",
 ];
 const SHELL_HOSTS = new Set([self.location.host, "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"]);
-const PHOTO_HOST = "inaturalist-open-data.s3.amazonaws.com";
+const PHOTO_HOSTS = new Set(["inaturalist-open-data.s3.amazonaws.com", "upload.wikimedia.org"]);
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.host === PHOTO_HOST) event.respondWith(cacheFirst(req));
+  if (PHOTO_HOSTS.has(url.host)) event.respondWith(cacheFirst(req));
   else if (SHELL_HOSTS.has(url.host)) event.respondWith(staleWhileRevalidate(req, event));
 });
 

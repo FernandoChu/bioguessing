@@ -16,6 +16,7 @@ Usage:  python3 pipeline/build_tree.py [--scale 1.0] [--photos 3] [--skip-photos
 Standard library only.
 """
 import argparse
+import copy
 import csv
 from http.client import HTTPException
 import hashlib
@@ -59,6 +60,112 @@ GROUPS = [
 # mostly from galls, leaf mines or tracks don't make it into a photo game.
 EVIDENCE_ORGANISM = {"term_id": 22, "term_value_id": 24}
 MAX_PER_GENUS = 2
+
+# Famous extinct animals, [scientific name, common name]. Only those whose first appearance in the
+# Paleobiology Database is in the Mesozoic or later (<= 252 Mya) are kept.
+EXTINCT = [
+    ["Tyrannosaurus rex", "Tyrannosaurus"], ["Triceratops horridus", "Triceratops"],
+    ["Stegosaurus stenops", "Stegosaurus"], ["Velociraptor mongoliensis", "Velociraptor"],
+    ["Brachiosaurus altithorax", "Brachiosaurus"], ["Diplodocus carnegii", "Diplodocus"],
+    ["Spinosaurus aegyptiacus", "Spinosaurus"], ["Ankylosaurus magniventris", "Ankylosaurus"],
+    ["Parasaurolophus walkeri", "Parasaurolophus"], ["Iguanodon bernissartensis", "Iguanodon"],
+    ["Allosaurus fragilis", "Allosaurus"], ["Archaeopteryx lithographica", "Archaeopteryx"],
+    ["Pteranodon longiceps", "Pteranodon"], ["Quetzalcoatlus northropi", "Quetzalcoatlus"],
+    ["Ichthyosaurus communis", "Ichthyosaurus"], ["Plesiosaurus dolichodeirus", "Plesiosaurus"],
+    ["Mosasaurus hoffmannii", "Mosasaurus"], ["Elasmosaurus platyurus", "Elasmosaurus"],
+    ["Deinosuchus riograndensis", "Deinosuchus"], ["Sarcosuchus imperator", "Sarcosuchus"],
+    ["Leedsichthys problematicus", "Leedsichthys"], ["Otodus megalodon", "Megalodon"],
+    ["Dactylioceras commune", "Dactylioceras (ammonite)"],
+    ["Titanoboa cerrejonensis", "Titanoboa"], ["Gastornis gigantea", "Gastornis"],
+    ["Phorusrhacos longissimus", "Terror bird"], ["Argentavis magnificens", "Argentavis"],
+    ["Basilosaurus cetoides", "Basilosaurus"], ["Ambulocetus natans", "Ambulocetus"],
+    ["Pakicetus attocki", "Pakicetus"], ["Paraceratherium transouralicum", "Paraceratherium"],
+    ["Megatherium americanum", "Giant ground sloth"], ["Glyptodon clavipes", "Glyptodon"],
+    ["Smilodon fatalis", "Sabre-toothed cat"], ["Mammuthus primigenius", "Woolly mammoth"],
+    ["Mammut americanum", "American mastodon"], ["Coelodonta antiquitatis", "Woolly rhinoceros"],
+    ["Megaloceros giganteus", "Irish elk"], ["Diprotodon optatum", "Diprotodon"],
+    ["Thylacoleo carnifex", "Marsupial lion"], ["Arctodus simus", "Short-faced bear"],
+    ["Aenocyon dirus", "Dire wolf"], ["Varanus priscus", "Megalania"],
+    ["Homo neanderthalensis", "Neanderthal"],
+    ["Raphus cucullatus", "Dodo"], ["Dinornis robustus", "South Island giant moa"],
+    ["Hieraaetus moorei", "Haast's eagle"], ["Ectopistes migratorius", "Passenger pigeon"],
+    ["Pinguinus impennis", "Great auk"], ["Thylacinus cynocephalus", "Thylacine"],
+    ["Hydrodamalis gigas", "Steller's sea cow"], ["Aepyornis maximus", "Elephant bird"],
+    ["Conuropsis carolinensis", "Carolina parakeet"], ["Bos primigenius", "Aurochs"],
+]
+MESOZOIC_START = 252.0
+# Where each fossil goes. Open Tree's synthetic tree is built mostly from living species and places
+# many fossils badly, so fossils are placed by hand relative to living groups:
+#   "in":   added inside a living group (the first name found in the tree is used).
+#   "stem": branches inserted above a living group, outermost first. Each level is
+#           (clade name or None, common name, [what branches off at that level]). A branch is a
+#           species name or a fossil-only clade (name, common name, [branches]).
+# Named fossil clades also take their first appearance in the Paleobiology Database as a minimum age.
+FOSSIL_IN = {
+    "Deinosuchus riograndensis": ["Alligatoridae", "Crocodylia"],
+    "Mosasaurus hoffmannii": ["Squamata"],
+    "Titanoboa cerrejonensis": ["Boidae", "Serpentes"],
+    "Varanus priscus": ["Varanus", "Varanidae", "Anguimorpha"],
+    "Otodus megalodon": ["Lamniformes", "Selachii", "Elasmobranchii"],
+    "Gastornis gigantea": ["Galloanserae"],
+    "Phorusrhacos longissimus": ["Cariamiformes", "Neoaves", "Aves"],
+    "Argentavis magnificens": ["Cathartidae", "Accipitriformes", "Neoaves"],
+    "Dinornis robustus": ["Palaeognathae"],
+    "Aepyornis maximus": ["Palaeognathae"],
+    "Hieraaetus moorei": ["Accipitridae", "Accipitriformes"],
+    "Raphus cucullatus": ["Columbidae", "Columbiformes"],
+    "Ectopistes migratorius": ["Columbidae", "Columbiformes"],
+    "Pinguinus impennis": ["Alcidae", "Charadriiformes"],
+    "Conuropsis carolinensis": ["Psittacidae", "Psittaciformes"],
+    "Mammuthus primigenius": ["Elephantidae", "Proboscidea"],
+    "Smilodon fatalis": ["Felidae"],
+    "Aenocyon dirus": ["Canidae"],
+    "Arctodus simus": ["Ursidae"],
+    "Coelodonta antiquitatis": ["Rhinocerotidae", "Perissodactyla"],
+    "Megaloceros giganteus": ["Cervidae", "Ruminantia"],
+    "Bos primigenius": ["Bos", "Bovidae"],
+    "Megatherium americanum": ["Folivora", "Pilosa", "Xenarthra"],
+    "Glyptodon clavipes": ["Chlamyphoridae", "Cingulata", "Xenarthra"],
+    "Diprotodon optatum": ["Vombatiformes", "Diprotodontia"],
+    "Thylacoleo carnifex": ["Vombatiformes", "Diprotodontia"],
+    "Thylacinus cynocephalus": ["Dasyuromorphia", "Marsupialia"],
+    "Hydrodamalis gigas": ["Dugongidae", "Sirenia"],
+    "Homo neanderthalensis": ["Homo", "Hominidae", "Catarrhini", "Primates"],
+}
+# Approximate ages (Mya) of the split between the sampled members of each fossil clade, from the
+# standard literature. The Paleobiology Database's first appearances for these clades include
+# contested early fossils, which squeezes all the dinosaur splits against each other.
+FOSSIL_CLADE_AGE = {
+    "Avemetatarsalia": 245, "Pterosauria": 160, "Dinosauria": 235, "Ornithischia": 200,
+    "Thyreophora": 180, "Neornithischia": 175, "Saurischia": 231, "Sauropoda": 170,
+    "Theropoda": 175, "Coelurosauria": 170, "Paraves": 165, "Avialae": 155, "Plesiosauria": 195,
+}
+FOSSIL_STEM = {
+    # bird-line archosaurs: pterosaurs, then the dinosaurs, down to the birds
+    ("Aves",): [
+        ("Avemetatarsalia", "bird-line archosaurs", [("Pterosauria", "pterosaurs", ["Pteranodon longiceps", "Quetzalcoatlus northropi"])]),
+        ("Dinosauria", "dinosaurs", [("Ornithischia", "bird-hipped dinosaurs", [
+            ("Thyreophora", "armoured dinosaurs", ["Stegosaurus stenops", "Ankylosaurus magniventris"]),
+            ("Neornithischia", None, ["Iguanodon bernissartensis", "Parasaurolophus walkeri", "Triceratops horridus"])])]),
+        ("Saurischia", "lizard-hipped dinosaurs", [("Sauropoda", "long-necked dinosaurs", ["Brachiosaurus altithorax", "Diplodocus carnegii"])]),
+        ("Theropoda", "theropods", ["Spinosaurus aegyptiacus", "Allosaurus fragilis"]),
+        ("Coelurosauria", None, ["Tyrannosaurus rex"]),
+        ("Paraves", None, ["Velociraptor mongoliensis"]),
+        ("Avialae", "birds and their closest relatives", ["Archaeopteryx lithographica"]),
+    ],
+    ("Crocodylia",): [(None, None, ["Sarcosuchus imperator"])],
+    # marine reptiles branch off near the base of the living reptiles
+    ("Sauria", "Sauropsida"): [(None, None, [
+        ("Ichthyosauria", "ichthyosaurs", ["Ichthyosaurus communis"]),
+        ("Plesiosauria", "plesiosaurs", ["Plesiosaurus dolichodeirus", "Elasmosaurus platyurus"])])],
+    # whales: successive steps from land to sea
+    ("Cetacea",): [(None, None, ["Pakicetus attocki"]), (None, None, ["Ambulocetus natans"]), (None, None, ["Basilosaurus cetoides"])],
+    ("Elephantidae", "Proboscidea"): [("Elephantimorpha", None, ["Mammut americanum"])],
+    ("Rhinocerotidae",): [(None, None, ["Paraceratherium transouralicum"])],
+    ("Teleostei",): [(None, None, ["Leedsichthys problematicus"])],
+    ("Coleoidea",): [(None, None, ["Dactylioceras commune"])],
+}
+OK_IMAGE_LICENSES = re.compile(r"^(cc0|public domain|pd|cc by(-sa)? [0-9.]+|cc by(-sa)?)", re.I)
 
 # Species on the early branches of big groups. The most-observed species rarely include them,
 # and without them a clade's age is only that of the lineages that happened to be sampled
@@ -289,6 +396,198 @@ def anchor_species(pool):
     return added
 
 
+def pbdb_record(name):
+    _, d = http("https://paleobiodb.org/data1.2/taxa/single.json", params={"name": name, "show": "app,class"},
+                allow_status=(400, 404))
+    rec = (d or {}).get("records") or []
+    return rec[0] if rec and rec[0].get("fea") is not None else None
+
+
+def pbdb_range(name):
+    """(first appearance, last appearance) in Mya from the Paleobiology Database."""
+    rec = pbdb_record(name)
+    return (float(rec["fea"]), float(rec.get("lla") or 0)) if rec else None
+
+
+def lineage_minimum(name, fa):
+    """Where a fossil joins living relatives is at least as old as its oldest fossil, and as old as
+    its genus or family when that whole group is extinct (the mastodon's family is ~27 My old)."""
+    rec = pbdb_record(name) or {}
+    oldest = fa
+    for key in ("gnl", "fml"):
+        group = rec.get(key)
+        if group:
+            g = pbdb_record(group)
+            if g and str(g.get("ext")) == "0":
+                oldest = max(oldest, float(g["fea"]))
+    return oldest
+
+
+def strip_html(t):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", t or "")).strip()
+
+
+def commons_picture(name):
+    """Lead image of the species' English Wikipedia article, with its Commons license and author."""
+    _, d = http("https://en.wikipedia.org/w/api.php", params={
+        "action": "query", "titles": name, "redirects": 1, "prop": "pageimages",
+        "piprop": "name", "format": "json"})
+    pages = list(((d or {}).get("query") or {}).get("pages", {}).values())
+    fname = pages[0].get("pageimage") if pages else None
+    if not fname:
+        return None
+    _, c = http("https://commons.wikimedia.org/w/api.php", params={
+        "action": "query", "titles": f"File:{fname}", "prop": "imageinfo",
+        "iiprop": "url|extmetadata", "iiurlwidth": 500, "format": "json"})
+    cp = list(((c or {}).get("query") or {}).get("pages", {}).values())
+    if not cp or not cp[0].get("imageinfo"):
+        return None
+    ii = cp[0]["imageinfo"][0]
+    meta = ii.get("extmetadata", {})
+    lic = strip_html(meta.get("LicenseShortName", {}).get("value"))
+    if not OK_IMAGE_LICENSES.match(lic):
+        log(f"  ! {name}: image license '{lic}' not usable")
+        return None
+    artist = strip_html(meta.get("Artist", {}).get("value")) or "Unknown author"
+    return {"u": ii.get("thumburl") or ii["url"], "a": f"{artist}, {lic}, via Wikimedia Commons",
+            "l": lic.lower(), "o": ii.get("descriptionurl")}
+
+
+def extinct_species():
+    out = []
+    for i, (name, common) in enumerate(EXTINCT):
+        rng = pbdb_range(name) or pbdb_range(name.split()[0])
+        if not rng:
+            log(f"  ! {name}: no time range in the Paleobiology Database, skipped")
+            continue
+        fa, la = rng
+        if fa > MESOZOIC_START:
+            log(f"  ! {name}: first appears {fa} Mya, before the Mesozoic, skipped")
+            continue
+        pic = commons_picture(name)
+        out.append({
+            "inat": f"x{i}", "name": name, "common": common, "obs": None, "group": "extinct",
+            "anc": [], "extinct": True, "fa": fa, "la": la, "photos": [pic] if pic else [],
+            "min_join": lineage_minimum(name, fa),
+        })
+    log(f"  {len(out)} extinct species, {sum(1 for sp in out if sp['photos'])} with a picture")
+    return out
+
+
+def place_fossils(tree, fossils):
+    """Insert fossils into the living tree using FOSSIL_IN and FOSSIL_STEM."""
+    by_sci = {sp["name"]: sp for sp in fossils}
+    used = set()
+
+    def index():  # clades first, then species that stand alone for a group (a family with one species)
+        idx = {}
+        for want_clades in (True, False):
+            for n in iter_nodes(tree):
+                if bool(n["children"]) == want_clades:
+                    names = [n["name"]] + n.get("aliases", []) + list(n.get("ids", {})) if want_clades else n.get("aliases", [])
+                    for nm in names:
+                        if nm and nm not in idx:
+                            idx[nm] = n
+        return idx
+
+    def as_clade(found, node):
+        """A group represented by one species becomes a clade around it, so fossils can join it."""
+        if node["children"]:
+            return node
+        par = parent_of(node)
+        clade = {"name": found, "ott": None, "children": [node], "fossil_clade": False}
+        node["aliases"] = [a for a in node.get("aliases", []) if a != found]
+        par["children"][par["children"].index(node)] = clade
+        return clade
+
+    def find(names):
+        idx = index()
+        return next(((nm, idx[nm]) for nm in names if nm in idx), (None, None))
+
+    def leaf(name):
+        sp = by_sci.get(name)
+        if not sp:
+            return None
+        used.add(name)
+        return {"name": sp["name"], "ott": sp.get("ott"), "sp": sp, "children": []}
+
+    def branch(b):
+        if isinstance(b, str):
+            return leaf(b)
+        name, common, parts = b
+        kids = [k for k in (branch(p) for p in parts) if k]
+        if not kids:
+            return None
+        if len(kids) == 1:  # a one-species fossil clade is just that species; keep the name as an alias
+            if name:
+                kids[0]["aliases"] = kids[0].get("aliases", []) + [name]
+            return kids[0]
+        node = {"name": name, "ott": None, "children": kids, "fossil_clade": True}
+        if common:
+            node["common"] = common
+        return node
+
+    def parent_of(target):
+        for n in iter_nodes(tree):
+            if target in n["children"]:
+                return n
+        return None
+
+    for names, levels in FOSSIL_STEM.items():
+        found, node = find(names)
+        if not node:
+            log(f"  ! none of {names} in the tree; skipping its fossil stem")
+            continue
+        chain_top = inner = None
+        for name, common, parts in levels:
+            kids = [k for k in (branch(p) for p in parts) if k]
+            if not kids:
+                continue
+            level = {"name": name, "ott": None, "children": kids, "fossil_clade": True}
+            if common:
+                level["common"] = common
+            if inner:
+                inner["children"].append(level)
+            else:
+                chain_top = level
+            inner = level
+        if not inner:
+            continue
+        par = parent_of(node)
+        if par:
+            par["children"][par["children"].index(node)] = chain_top
+        else:  # the living group is the root
+            tree = chain_top
+        inner["children"].append(node)
+        log(f"  stem of {found}: {', '.join(l[0] or '·' for l in levels)}")
+
+    for name, groups in FOSSIL_IN.items():
+        if name not in by_sci:
+            continue
+        found, node = find(groups)
+        if node:
+            as_clade(found, node)["children"].append(leaf(name))
+        else:
+            log(f"  ! {name}: none of {groups} in the tree, skipped")
+    missing = [n for n in by_sci if n not in used]
+    if missing:
+        log(f"  ! no placement for {missing}")
+    log(f"  placed {len(used)} of {len(fossils)} extinct species")
+    return tree
+
+
+def fossil_clade_minimums(tree):
+    """Named fossil clades are at least as old as their first appearance in the fossil record."""
+    for n in iter_nodes(tree):
+        if n.get("fossil_clade") and n["name"]:
+            if n["name"] in FOSSIL_CLADE_AGE:
+                n["age"], n["dated"], n["published"] = float(FOSSIL_CLADE_AGE[n["name"]]), True, True
+                continue
+            rng = pbdb_range(n["name"])
+            if rng:
+                n["min_age"] = rng[0]
+
+
 # ---------------------------------------------------------------- 2. Open Tree matching
 
 def match_ott(pool):
@@ -316,11 +615,14 @@ def match_ott(pool):
 
 # ---------------------------------------------------------------- 3. topology
 
-def induced_subtree(ott_ids):
+def induced_subtree(ott_ids, node_ids=()):
     ids = list(ott_ids)
     for _ in range(10):
+        body = {"ott_ids": ids, "label_format": "name_and_id"}
+        if node_ids:
+            body["node_ids"] = list(node_ids)
         status, d = http("https://api.opentreeoflife.org/v3/tree_of_life/induced_subtree",
-                         body={"ott_ids": ids, "label_format": "name_and_id"}, allow_status=(400,))
+                         body=body, allow_status=(400,))
         if status == 200:
             return d, set(ids)
         unknown = set()
@@ -388,7 +690,9 @@ def parse_newick(s):
 LABEL_RE = re.compile(r"^(.*)_ott(\d+)$")
 
 
-def build_tree(newick, species, broken):
+def build_tree(newick, species, broken, proxies=None):
+    """proxies: {node id: [fossil species]} for fossils placed at their nearest group in the tree."""
+    proxies = proxies or {}
     by_ott = {sp["ott"]: sp for sp in species}
     # broken taxa appear under an mrca label instead of their own
     mrca_to_ott = {v: int(re.sub(r"\D", "", k)) for k, v in (broken or {}).items()}
@@ -402,6 +706,12 @@ def build_tree(newick, species, broken):
             ott = mrca_to_ott[lab]
         kids = [convert(c) for c in n["children"]]
         kids = [k for k in kids if k]
+        key = lab if lab.startswith("mrca") else (f"ott{ott}" if ott else None)
+        if key in proxies:
+            fossils = [{"name": sp["name"], "ott": sp["ott"], "sp": sp, "children": []} for sp in proxies[key]]
+            if not kids and len(fossils) == 1:
+                return fossils[0]
+            kids = kids + fossils
         if ott in by_ott and not kids:
             sp = by_ott[ott]
             return {"name": sp["name"], "ott": ott, "sp": sp, "children": []}
@@ -499,16 +809,24 @@ def clade_names(tree, species):
         by_members.setdefault(frozenset(m), []).append(taxa[tid])
     common_by_name = {t["name"]: t["common"] for t in taxa.values() if t["common"]}
 
-    def leafset(n):
-        return frozenset(m["sp"]["inat"] for m in iter_nodes(n) if m.get("sp"))
+    def leafset(n):  # fossils are not in iNaturalist's taxonomy, so only living species count
+        return frozenset(m["sp"]["inat"] for m in iter_nodes(n) if m.get("sp") and not m["sp"].get("extinct"))
+
+    def post_order(n):
+        for c in n["children"]:
+            yield from post_order(c)
+        yield n
 
     renamed = filled = 0
-    for n in iter_nodes(tree):
+    claimed = set()
+    for n in post_order(tree):  # deepest first: birds get "Aves", not the node that also holds T. rex
         if not n["children"]:
             continue
-        cands = by_members.get(leafset(n), [])
-        if not cands:
+        key = leafset(n)
+        cands = by_members.get(key, [])
+        if not cands or key in claimed:
             continue
+        claimed.add(key)
         # standard ranks first, the broadest of them (Primates over Cercopithecidae);
         # otherwise the narrowest, which best describes what was sampled (Cetacea over Whippomorpha)
         best = max(cands, key=lambda t: (t["rank_level"] in CLASSIC_RANKS,
@@ -590,9 +908,13 @@ def species_totals(tree):
                     d.append(one)
         for x in d:
             tips[x.get("node_id")] = x.get("num_tips")
-    for n in internal:
-        t = tips.get(n.get("count_id"))
-        n["total"] = max(t or 0, size(n))
+    def total(n):  # a clade has at least as many species as its branches together
+        if not n["children"]:
+            return 1
+        t = max(tips.get(n.get("count_id")) or 0, sum(total(c) for c in n["children"]))
+        n["total"] = t
+        return t
+    total(tree)
     log(f"  species totals for {sum(1 for n in internal if n.get('count_id') in tips)} of {len(internal)} clades")
 
 
@@ -665,6 +987,8 @@ def date_tree(tree):
         if i % 100 == 0:
             log(f"  dating {i}/{len(internal)}")
         kids = sorted(n["children"], key=lambda c: -sum(1 for _ in iter_nodes(c)))
+        if len(kids) < 2 or n.get("published"):
+            continue
         age = None
         # compare one species from the two largest children; try a few representatives
         ra, rb = reps(kids[0]), reps(kids[1])
@@ -683,7 +1007,7 @@ def date_tree(tree):
     # named clades: use the published crown age, so the age is the whole clade's, not just our sample's
     published = 0
     for n in internal:
-        if n["name"] and n is not tree:
+        if n["name"] and n is not tree and not n.get("fossil_clade"):
             age = taxon_age(n["name"])
             if age:
                 n["age"], n["dated"], n["published"] = age, True, True
@@ -693,9 +1017,11 @@ def date_tree(tree):
     # leaves are today; make every dated node at least as old as its dated descendants
     def fix(n):
         if not n["children"]:
-            n["age"], n["dated"] = 0.0, True
-            return 0.0
-        oldest = max(fix(c) for c in n["children"])
+            sp = n.get("sp") or {}
+            n["age"], n["dated"] = (sp["la"], True) if sp.get("extinct") else (0.0, True)
+            # the lineage existed from its first appearance (or its extinct family's)
+            return sp.get("min_join", sp["fa"]) if sp.get("extinct") else 0.0
+        oldest = max([fix(c) for c in n["children"]] + [n.get("min_age", 0)])
         if n.get("dated") and n["age"] <= oldest:
             n["age"] = oldest * 1.01 + 0.1
         return n["age"] if n.get("dated") else oldest
@@ -718,13 +1044,18 @@ def date_tree(tree):
 
     # undated nodes: evenly spaced between the dated ancestor and the oldest dated descendant
     def anchor(n):
+        if not n["children"]:
+            sp = n.get("sp") or {}
+            return (sp.get("min_join", sp["fa"]) if sp.get("extinct") else 0.0), 0
         if n.get("dated"):
             return n["age"], 0
         best = max((anchor(c) for c in n["children"]), key=lambda x: x[0])
+        if n.get("min_age", 0) > best[0]:
+            return n["min_age"], 0
         return best[0], best[1] + 1
 
     def fill(n, parent_age):
-        if not n.get("dated"):
+        if n["children"] and not n.get("dated"):
             d, k = anchor(n)
             n["age"] = d + (parent_age - d) * k / (k + 1)
         for c in n["children"]:
@@ -738,6 +1069,8 @@ def fetch_photos(species, per_species):
     for i, sp in enumerate(species):
         if i % 50 == 0:
             log(f"  photos {i}/{len(species)}")
+        if sp.get("extinct"):
+            continue
         url = "https://api.inaturalist.org/v1/observations"
         params = {"taxon_id": sp["inat"], "quality_grade": "research", "photo_license": LICENSES,
                   "photos": "true", "per_page": 10, "order_by": "votes", **EVIDENCE_ORGANISM}
@@ -766,6 +1099,37 @@ def fetch_photos(species, per_species):
 
 # ---------------------------------------------------------------- 7. output
 
+def living_copy(tree):
+    """The tree without fossils, with single-child nodes collapsed, as the page shows it when
+    extinct animals are turned off."""
+    t = copy.deepcopy(tree)
+
+    def prune(n):
+        if not n["children"]:
+            return None if (n.get("sp") or {}).get("extinct") else n
+        kids = [k for k in (prune(c) for c in n["children"]) if k]
+        if not kids:
+            return None
+        n["children"] = kids
+        return kids[0] if len(kids) == 1 else n
+    return prune(t)
+
+
+def set_living_ages(tree, living):
+    """Remember each clade's age in the living-only tree where fossils made it older."""
+    def key(n):
+        return frozenset(m["sp"]["inat"] for m in iter_nodes(n) if m.get("sp") and not m["sp"].get("extinct"))
+    ages = {key(n): n["age"] for n in iter_nodes(living) if n["children"]}
+    changed = 0
+    for n in iter_nodes(tree):
+        if n["children"]:
+            a = ages.get(key(n))
+            if a is not None and abs(a - n["age"]) > 0.5:
+                n["age_living"] = a
+                changed += 1
+    log(f"  {changed} clades are younger without their fossils")
+
+
 def compact(n):
     out = {"n": n["name"], "a": round(n.get("age", 0), 1)}
     if n.get("ott"):
@@ -783,10 +1147,16 @@ def compact(n):
             out["lb"] = n["label"]
             if n.get("label_common"):
                 out["lc"] = n["label_common"]
+        if n.get("age_living") is not None:
+            out["a0"] = round(n["age_living"], 1)
         out["k"] = [compact(c) for c in sorted(n["children"], key=size)]
     else:
         sp = n["sp"]
-        out.update({"c": sp.get("common"), "inat": sp["inat"], "obs": sp["obs"]})
+        out["c"] = sp.get("common")
+        if sp.get("extinct"):
+            out["x"] = [round(sp["fa"], 2), round(sp["la"], 4)]
+        else:
+            out.update({"inat": sp["inat"], "obs": sp["obs"]})
         if sp.get("photos"):
             out["ph"] = sp["photos"]
     return out
@@ -806,19 +1176,31 @@ def main():
     log("1. species pool (iNaturalist)")
     pool = species_pool(args.scale)
     pool += anchor_species(pool)
+    log("1b. extinct species (Paleobiology Database, Wikimedia Commons)")
+    pool += extinct_species()
     log("2. matching names (Open Tree)")
     species = match_ott(pool)
     log("3. topology (Open Tree induced subtree)")
-    d, kept = induced_subtree(sorted({sp["ott"] for sp in species}))
-    species = [sp for sp in species if sp["ott"] in kept]
+    fossils = [sp for sp in pool if sp.get("extinct")]
+    living = [sp for sp in species if not sp.get("extinct")]
+    d, kept = induced_subtree(sorted({sp["ott"] for sp in living}))
+    species = [sp for sp in living if sp["ott"] in kept]
     tree = build_tree(d["newick"], species, d.get("broken"))
     tree["name"] = tree["name"] or "Animalia"
     log("4. clade names (iNaturalist, Wikidata)")
     clade_names(tree, species)
+    log("4b. placing extinct species")
+    tree = place_fossils(tree, fossils)
+    fossil_clade_minimums(tree)
+    species += [m["sp"] for m in iter_nodes(tree) if m.get("sp", {}).get("extinct")]
     describe_unnamed(tree)
     species_totals(tree)
     log("5. dates (TimeTree)")
+    living = living_copy(tree)
     date_tree(tree)
+    log("5b. dates for the living-only tree (used when extinct animals are hidden)")
+    date_tree(living)
+    set_living_ages(tree, living)
     in_tree = {m["sp"]["inat"]: m["sp"] for m in iter_nodes(tree) if m.get("sp")}
     if not args.skip_photos:
         log("6. photos (iNaturalist)")
@@ -835,6 +1217,7 @@ def main():
                 "dates": "TimeTree pairwise estimates; nodes marked est=1 are interpolated",
                 "names": "iNaturalist (species), Wikidata (clades)",
                 "photos": "iNaturalist observations; each photo keeps its own license and attribution",
+                "extinct": "Paleobiology Database time ranges; pictures from Wikimedia Commons",
             },
         },
         "tree": compact(tree),
