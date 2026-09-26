@@ -175,6 +175,27 @@ aside{display:flex;flex-direction:column;gap:14px}
 .chips button{padding:6px 10px;font-weight:600}
 .chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
 .cladograms{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cladograms.one{grid-template-columns:1fr}
+/* Build the tree */
+.bt{display:flex;flex-direction:column;gap:10px}
+.bt-tree{position:relative;width:100%}
+.bt-tree svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.bt-tree .edge{stroke:var(--ink);fill:none;stroke-width:2.5px;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.bt-tree .edge.ok{stroke:var(--good)}
+.bt-tree .edge.bad{stroke:var(--answer)}
+.bt-slot{position:absolute;right:0;height:46px;display:flex;align-items:center;border-radius:8px;font-size:12.5px;color:var(--muted)}
+.bt-slot.empty{border:1.5px dashed var(--line);padding:0 10px;cursor:pointer;background:var(--bg)}
+.bt-slot.over{outline:2px solid var(--accent);outline-offset:1px;background:var(--accent-soft)}
+.bt-slot .bt-chip{width:100%}
+.bt-tray{display:flex;flex-direction:column;gap:6px;min-height:46px;padding:6px;border:1.5px dashed var(--line);border-radius:8px}
+.bt-tray:empty{display:none}
+.bt-chip{display:grid;grid-template-columns:36px auto 1fr;gap:8px;align-items:center;height:46px;padding:4px 8px 4px 4px;background:var(--surface);border:1px solid var(--line);border-radius:8px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.bt-chip img{width:36px;height:36px;object-fit:cover;border-radius:6px;background:var(--bg);pointer-events:none}
+.bt-chip b{font-size:12px;letter-spacing:.06em;color:var(--muted)}
+.bt-chip span{font-family:var(--serif);font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.bt-chip.picked{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+.bt-chip.dragging{opacity:.35}
+.bt-chip.ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:grabbing}
 .cladograms figure{margin:0;display:flex;flex-direction:column;gap:4px}
 .cladograms figcaption{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .cladograms svg{width:100%;height:auto;display:block}
