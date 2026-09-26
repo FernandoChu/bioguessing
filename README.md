@@ -14,8 +14,12 @@ onward can be switched on or off.
 
 The page has two modes. **Explore** is the map on its own. **Play** lists the games; each one
 is a file in `shared/games/` that calls `BG.registerGame(...)` (see the comment at the top of
-`shared/ui.js` for the interface). The first game, `place.js`, shows a photo and scores where you
-put the animal on the tree.
+`shared/ui.js` for the interface). Games so far:
+
+- **Place the animal** (`place.js`): see a photo and click where it belongs; the score depends on
+  how long ago your pick and the answer shared an ancestor.
+- **Closest relatives** (`trio.js`): three species, pick the two most closely related. The reveal
+  opens the clade where all three meet and highlights the pair's clade.
 
 Everything is static: plain HTML and JavaScript, with d3 and fonts from public CDNs. A service
 worker (`sw.js`) caches the site and recently viewed photos in the browser, so repeat visits

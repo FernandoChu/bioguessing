@@ -17,16 +17,22 @@
   BG.pxPerUnit = svgNode => (svgNode.getBoundingClientRect().width || 700) / 1000;
 
   const PIN = "M0,0 C-3,-8 -10,-12 -10,-20 A10,10 0 1 1 10,-20 C10,-12 3,-8 0,0Z";
-  // pins: [{x, y, kind: "guess" | "answer" | "pick"}], scale = viewBox units per screen px
+  // pins: [{x, y, kind: "guess" | "answer" | "pick", label?}], scale = viewBox units per screen px
   BG.drawPins = function (g, pins, scale) {
     g.selectAll("g.pin").data(pins).join(enter => {
       const p = enter.append("g");
       p.append("path").attr("d", PIN);
-      p.append("circle").attr("cy", -20).attr("r", 3.5);
+      p.append("circle").attr("cy", -20);
+      p.append("text").attr("y", -20);
       return p;
     })
-      .attr("class", d => "pin " + d.kind)
-      .attr("transform", d => `translate(${d.x},${d.y}) scale(${scale})`);
+      .attr("class", d => "pin " + d.kind + (d.label ? " labelled" : ""))
+      .attr("transform", d => `translate(${d.x},${d.y}) scale(${scale})`)
+      .each(function (d) {
+        const p = d3.select(this);
+        p.select("circle").attr("r", d.label ? 7 : 3.5);
+        p.select("text").text(d.label || "");
+      });
   };
 
   const games = [];

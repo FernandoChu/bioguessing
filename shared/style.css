@@ -134,4 +134,22 @@ aside{display:flex;flex-direction:column;gap:14px}
 .pin.answer path{fill:var(--answer)}
 .pin.pick path{fill:var(--accent)}
 .pin circle{fill:var(--surface)}
+.pin text{fill:var(--ink);font:700 10px var(--sans);text-anchor:middle;dominant-baseline:central}
+.hl-area.soft{fill:var(--accent-soft);stroke-dasharray:4 4;opacity:.8}
+.hl-line.alt{stroke:var(--answer)}
+.trio{display:flex;flex-direction:column;gap:8px}
+.trio .card{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;text-align:left;padding:6px;border-radius:8px}
+.trio .card img{width:96px;height:96px;object-fit:cover;border-radius:6px;background:var(--bg);display:block}
+.trio .card .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.trio .card .letter{font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.trio .card strong{font-family:var(--serif);font-weight:600;line-height:1.25}
+.trio .card em{font-family:var(--serif);color:var(--muted);font-size:13.5px}
+.trio .card small{color:var(--muted);font-size:11.5px;overflow-wrap:anywhere}
+.trio .card[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.trio .card.odd{opacity:.55}
+.trio .card.right{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.trio .card.outgroup{border-color:var(--answer);box-shadow:inset 0 0 0 2px var(--answer)}
+.verdict{font-weight:700;font-size:17px}
+.tally{display:flex;gap:16px;color:var(--muted);font-size:13.5px;font-variant-numeric:tabular-nums}
+.tally b{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}

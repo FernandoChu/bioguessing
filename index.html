@@ -46,6 +46,7 @@
 <script src="shared/data.js"></script>
 <script src="shared/ui.js"></script>
 <script src="shared/games/place.js"></script>
+<script src="shared/games/trio.js"></script>
 <script>
 const { root, nodes, leaves } = BG;
 const svg = d3.select("#svg");
@@ -77,6 +78,9 @@ const gEra = layer("eras"), gArea = layer("areas"), gWedge = layer("wedges"), gB
 
 let T = d3.zoomIdentity, px = 0.7, showEras = true;
 let hoverN = null, selN = null, result = null;
+// Marks a game can put on the map: { areas: [{node, strong}], routes: [{from, to, via, alt}],
+// pins: [{node, kind, label}] }. Shown instead of hover and selection while set.
+let marks = null;
 // geometry of the current frame
 let c = [C, C], k = 1, s = 0.7;
 const u = v => v / px;                                   // screen px -> viewBox units
@@ -237,7 +241,19 @@ function drawMarks() {
     area(n, strong ? 2.5 : 1.5);
     lines.push({ d: polyD(routeUp(n, drawRoot)), w: strong ? 3.2 : 2.4 });
   };
-  if (result) {
+  if (marks) {
+    (marks.areas || []).forEach(m => area(m.node, m.strong ? 3.2 : 1.4));
+    (marks.routes || []).forEach(m => {
+      if (!inView(m.from) || !inView(m.to) || !inView(m.via)) return;
+      const pts = routeUp(m.from, m.via).concat(routeUp(m.to, m.via).reverse());
+      lines.push({ d: polyD(pts), w: 3.2, alt: m.alt });
+    });
+    (marks.pins || []).forEach(m => {
+      if (!inView(m.node)) return;
+      const p = P(angOf(m.node), nodeR(m.node));
+      pins.push({ x: p[0], y: p[1], kind: m.kind, label: m.label });
+    });
+  } else if (result) {
     const r = result;
     if (!r.same) area(r.anc, 3);
     if (inView(r.guess) && inView(r.answer) && inView(r.anc)) {
@@ -255,9 +271,9 @@ function drawMarks() {
     }
     if (hoverN && hoverN !== selN) addFocus(hoverN, false);
   }
-  gArea.selectAll("path").data(areas).join("path").attr("class", "hl-area").attr("d", d => d.d)
+  gArea.selectAll("path").data(areas).join("path").attr("class", d => d.w < 2 ? "hl-area soft" : "hl-area").attr("d", d => d.d)
     .style("stroke-width", d => u(d.w) + "px");
-  gLine.selectAll("path").data(lines).join("path").attr("class", "hl-line").attr("d", d => d.d)
+  gLine.selectAll("path").data(lines).join("path").attr("class", d => d.alt ? "hl-line alt" : "hl-line").attr("d", d => d.d)
     .style("stroke-width", d => u(d.w) + "px");
   BG.drawPins(gPin, pins, u(1));
 }
@@ -368,6 +384,7 @@ BG.init({
   reset(n) { setRoot(n || root); },
   root: () => viewRoot,
   setRoot,
+  marks(spec) { marks = spec; drawMarks(); },
 }, {
   controls: [
     { id: "t-eras", label: "Show geological periods", checked: true, onchange: v => { showEras = v; render(); } },
