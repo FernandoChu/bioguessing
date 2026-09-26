@@ -242,11 +242,13 @@ function drawMarks() {
     lines.push({ d: polyD(routeUp(n, drawRoot)), w: strong ? 3.2 : 2.4 });
   };
   if (marks) {
-    (marks.areas || []).forEach(m => area(m.node, m.strong ? 3.2 : 1.4));
+    (marks.areas || []).forEach(m => {
+      if (m.node.children && inView(m.node)) areas.push({ d: sectorD(v0(m.node), v1(m.node), rt(m.node.age), rOut), w: m.strong ? 3.2 : 1.6, kind: m.kind });
+    });
     (marks.routes || []).forEach(m => {
       if (!inView(m.from) || !inView(m.to) || !inView(m.via)) return;
       const pts = routeUp(m.from, m.via).concat(routeUp(m.to, m.via).reverse());
-      lines.push({ d: polyD(pts), w: 3.2, alt: m.alt });
+      lines.push({ d: polyD(pts), w: 3.2, alt: m.alt, kind: m.kind });
     });
     (marks.pins || []).forEach(m => {
       if (!inView(m.node)) return;
@@ -271,9 +273,9 @@ function drawMarks() {
     }
     if (hoverN && hoverN !== selN) addFocus(hoverN, false);
   }
-  gArea.selectAll("path").data(areas).join("path").attr("class", d => d.w < 2 ? "hl-area soft" : "hl-area").attr("d", d => d.d)
+  gArea.selectAll("path").data(areas).join("path").attr("class", d => "hl-area" + (d.kind ? " " + d.kind : "")).attr("d", d => d.d)
     .style("stroke-width", d => u(d.w) + "px");
-  gLine.selectAll("path").data(lines).join("path").attr("class", d => d.alt ? "hl-line alt" : "hl-line").attr("d", d => d.d)
+  gLine.selectAll("path").data(lines).join("path").attr("class", d => "hl-line" + (d.alt ? " alt" : "") + (d.kind ? " " + d.kind : "")).attr("d", d => d.d)
     .style("stroke-width", d => u(d.w) + "px");
   BG.drawPins(gPin, pins, u(1));
 }

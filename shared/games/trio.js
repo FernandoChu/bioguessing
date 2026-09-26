@@ -53,6 +53,7 @@
       <img alt="" crossorigin="anonymous">
       <span class="t">
         <span class="letter">${LETTERS[i]}</span>
+        <span class="tags" hidden></span>
         <strong></strong>
         <em></em>
         <small></small>
@@ -115,10 +116,16 @@
     S.played++;
     if (correct) { S.right++; S.streak++; } else S.streak = 0;
 
+    // the answer gets its own colours (green pair, orange odd one out); the player's picks become tags
     [...$("tr-cards").children].forEach((el, j) => {
       el.classList.remove("odd");
+      el.setAttribute("aria-pressed", "false");
       el.classList.toggle("right", pairIdx.includes(j));
       el.classList.toggle("outgroup", j === oddIdx);
+      const tags = el.querySelector(".tags");
+      tags.innerHTML = (pairIdx.includes(j) ? `<span class="tag pair">✓ Closest relatives</span>` : `<span class="tag outgroup">Odd one out</span>`) +
+        (S.chosen.includes(j) ? `<span class="tag">Your pick</span>` : "");
+      tags.hidden = false;
     });
     const name = n => n.data.common || n.name;
     const clade = n => n.name + (n.data.common ? ` (${n.data.common})` : "");
@@ -135,9 +142,9 @@
     // open the clade where all three meet, and highlight both clades on the map
     ctx.view.setRoot(q.split);
     ctx.view.marks({
-      areas: [{ node: q.split, strong: false }, { node: q.pairClade, strong: true }],
-      routes: [{ from: q.pair[0], to: q.pair[1], via: q.pairClade }, { from: q.odd, to: q.pairClade, via: q.split, alt: true }],
-      pins: q.species.map((l, j) => ({ node: l, kind: l === q.odd ? "answer" : "pick", label: LETTERS[j] })),
+      areas: [{ node: q.split, kind: "soft" }, { node: q.pairClade, strong: true, kind: "pair" }],
+      routes: [{ from: q.pair[0], to: q.pair[1], via: q.pairClade, kind: "pair" }, { from: q.odd, to: q.pairClade, via: q.split, alt: true }],
+      pins: q.species.map((l, j) => ({ node: l, kind: l === q.odd ? "answer" : "pair", label: LETTERS[j] })),
     });
   }
 
@@ -152,7 +159,7 @@
     blurb: "Three species: which two are most closely related?",
     howTo: `<ol class="legend">
       <li><b>Pick two cards</b>: the two species you think share the most recent common ancestor. The third is the odd one out.</li>
-      <li><b>Check</b> to see the answer. The map opens the clade where all three meet: the pair's shared clade is highlighted, and the dashed area is the clade that includes the odd one out.</li>
+      <li><b>Check</b> to see the answer: the closest relatives turn <b style="color:var(--good)">green</b> and the odd one out <b style="color:var(--answer)">orange</b>, on the cards and on the map. The map opens the clade where all three meet; its dashed outline is the clade that includes the odd one out.</li>
       <li>Looks can mislead. Whales are closer to hippos than hippos are to pigs, and birds are closer to crocodiles than crocodiles are to lizards.</li>
     </ol>`,
 
