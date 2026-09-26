@@ -40,10 +40,6 @@ body.playing .modes button[aria-selected="true"]{background:var(--accent);color:
 body.playing .stage > svg{outline:2px solid var(--accent);outline-offset:-2px;border-radius:10px}
 .mode-panels{display:flex;flex-direction:column;gap:14px}
 #game-body,.game-panel{display:flex;flex-direction:column;gap:14px}
-.games{display:flex;flex-direction:column;gap:6px}
-.games .game{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 12px}
-.games .game span{color:var(--muted);font-size:13px}
-.games .game[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .eyebrow{margin:0;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
 h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .lede{margin:0;color:var(--muted);max-width:70ch;text-wrap:pretty}

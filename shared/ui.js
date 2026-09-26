@@ -116,8 +116,10 @@
       </div>
       <div id="play-mode" class="mode-panels" hidden>
         <section class="panel">
-          <h2>Games</h2>
-          <div class="games" id="game-list"></div>
+          <label class="field" for="game-select"><span class="hint">Game</span>
+            <select id="game-select"></select>
+            <small class="hint" id="game-blurb"></small>
+          </label>
         </section>
         <div id="game-body"></div>
         ${layers.replace(/id="(t-[a-z-]+)"/g, 'id="$1-play"')}
@@ -249,7 +251,8 @@
     function chooseGame(game) {
       if (S.game && S.mode === "play" && S.game !== game) S.game.leave(ctx);
       S.game = game;
-      document.querySelectorAll("#game-list .game").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === game.id));
+      $("game-select").value = game.id;
+      $("game-blurb").textContent = game.blurb || "";
       document.querySelectorAll("#game-body > .game-panel").forEach(el => { el.hidden = el.dataset.id !== game.id; });
       if (!mounted.has(game.id)) {
         const el = document.createElement("div");
@@ -262,12 +265,11 @@
       $("game-howto").innerHTML = game.howTo || "";
       game.enter(ctx);
     }
-    $("game-list").innerHTML = games.map(g =>
-      `<button class="game" data-id="${esc(g.id)}" aria-pressed="false"><strong>${esc(g.title)}</strong><span>${esc(g.blurb || "")}</span></button>`
-    ).join("") || `<p class="hint">No games yet.</p>`;
-    document.querySelectorAll("#game-list .game").forEach(b => {
-      b.onclick = () => { const g = games.find(x => x.id === b.dataset.id); if (g && g !== S.game) chooseGame(g); };
-    });
+    $("game-select").innerHTML = games.map(g => `<option value="${esc(g.id)}">${esc(g.title)}</option>`).join("");
+    $("game-select").onchange = () => {
+      const g = games.find(x => x.id === $("game-select").value);
+      if (g && g !== S.game) chooseGame(g);
+    };
 
     function setMode(m) {
       if (m === S.mode) return;
