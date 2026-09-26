@@ -24,10 +24,23 @@
   --cell-l:31%; --cell-s:32%; --br-l:70%; --br-s:42%;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 32px}
 .wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
-header{display:flex;flex-direction:column;gap:10px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
+.titles{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 420px}
+.modes{display:inline-grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--surface);gap:3px}
+.modes button{border:0;border-radius:7px;background:transparent;padding:8px 22px;font-weight:700;font-size:15px;color:var(--muted)}
+.modes button[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+body.playing .modes button[aria-selected="true"]{background:var(--accent);color:var(--surface)}
+body.playing .stage > svg{outline:2px solid var(--accent);outline-offset:-2px;border-radius:10px}
+.mode-panels{display:flex;flex-direction:column;gap:14px}
+#game-body,.game-panel{display:flex;flex-direction:column;gap:14px}
+.games{display:flex;flex-direction:column;gap:6px}
+.games .game{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 12px}
+.games .game span{color:var(--muted);font-size:13px}
+.games .game[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .eyebrow{margin:0;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
 h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .lede{margin:0;color:var(--muted);max-width:70ch;text-wrap:pretty}
@@ -45,9 +58,6 @@ button:focus-visible,a:focus-visible,input:focus-visible+span{outline:2px solid 
 aside{display:flex;flex-direction:column;gap:14px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .panel h2{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:700}
-.tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.tabs button{border:0;border-radius:0;background:transparent;padding:8px;font-weight:600;color:var(--muted)}
-.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
 .toggles{display:flex;flex-direction:column;gap:6px}
 .toggles label{display:flex;gap:9px;align-items:center;cursor:pointer}
 .toggles input{accent-color:var(--accent);width:16px;height:16px;margin:0}

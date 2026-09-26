@@ -17,8 +17,11 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>BioGuessing</h1>
-    <p class="lede">Place animals on the tree of life. Angle says which lineage, distance from the centre says when. Every clade is one unbroken slice of the circle. Double-click a clade to open it across the whole circle, and use ↑ to go back. Scroll or pinch to zoom in on detail.</p>
+    <div class="titles">
+      <h1>BioGuessing</h1>
+      <p class="lede">The animal tree of life, drawn as a map: angle is lineage, distance from the centre is time. Explore it, or test yourself in a game.</p>
+    </div>
+    <div id="modes"></div>
   </header>
   <div class="layout">
     <div class="stage">
@@ -42,6 +45,7 @@
 <script src="data/tree.js"></script>
 <script src="shared/data.js"></script>
 <script src="shared/ui.js"></script>
+<script src="shared/games/place.js"></script>
 <script>
 const { root, nodes, leaves } = BG;
 const svg = d3.select("#svg");
@@ -365,7 +369,6 @@ BG.init({
   root: () => viewRoot,
   setRoot,
 }, {
-  cladeFilter: true,
   controls: [
     { id: "t-eras", label: "Show geological periods", checked: true, onchange: v => { showEras = v; render(); } },
     ...(BG.hasExtinct ? [{ id: "t-extinct", label: "Include extinct animals (†)", checked: BG.showExtinct,
@@ -374,9 +377,8 @@ BG.init({
   about: `<ol class="legend">
     <li><b>Angle is lineage.</b> Every clade is one continuous slice, so rim neighbours are related at exactly the split where their branches meet.</li>
     <li><b>Radius is time.</b> The centre is the base of the clade you are viewing and the rim is today, on a square-root scale. The rings are geological periods, or epochs for young clades.</li>
-    <li><b>Double-click a clade to open it</b> across the whole circle. ↑, the centre, or the lineage list go back up. Shaded wedges are clades too small to draw; zoom or open them to see inside.</li>
-    <li><b>Picking:</b> click near the rim for a specific group, or further in along a branch for an older, broader lineage.</li>
-    ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. Turning them off also hides them from rounds.</li>` : ""}
+    <li><b>Click</b> a species or clade to see it. <b>Double-click a clade to open it</b> across the whole circle; ↑, the centre, or the lineage list go back up. Shaded wedges are clades too small to draw at this size.</li>
+    ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. Turning them off also removes them from games.</li>` : ""}
   </ol>
   <p class="hint">${BG.REAL
     ? `${BG.leaves.length.toLocaleString("en-US")} species. Tree from the Open Tree of Life, dates from TimeTree (some interpolated), photos from iNaturalist. Built ${BG.meta.built}.`

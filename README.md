@@ -9,8 +9,13 @@ Play: https://fernandochu.github.io/bioguessing/
 ## How it works
 
 `index.html` draws the tree radially: angle is lineage and distance from the centre is time.
-Double-click a clade to open it across the whole circle; rounds can be limited to one clade.
-Extinct animals from the Mesozoic onward can be switched on or off.
+Double-click a clade to open it across the whole circle. Extinct animals from the Mesozoic
+onward can be switched on or off.
+
+The page has two modes. **Explore** is the map on its own. **Play** lists the games; each one
+is a file in `shared/games/` that calls `BG.registerGame(...)` (see the comment at the top of
+`shared/ui.js` for the interface). The first game, `place.js`, shows a photo and scores where you
+put the animal on the tree.
 
 Everything is static: plain HTML and JavaScript, with d3 and fonts from public CDNs. A service
 worker (`sw.js`) caches the site and recently viewed photos in the browser, so repeat visits
