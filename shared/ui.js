@@ -60,6 +60,11 @@
         <ul class="crumbs" id="crumbs"></ul>
       </section>
       <section class="panel" id="guess-panel" hidden>
+        ${opts.cladeFilter ? `
+        <label class="field" for="round-clade"><span class="hint">Species from</span>
+          <select id="round-clade"></select>
+          <small class="hint" id="round-count"></small>
+        </label>` : ""}
         <h2>Mystery animal</h2>
         <div class="photo">
           <img id="m-img" alt="Photo of the mystery animal" crossorigin="anonymous" hidden>
@@ -95,7 +100,8 @@
     const $ = id => document.getElementById(id);
     (opts.controls || []).forEach(c => { $(c.id).onchange = e => c.onchange(e.target.checked); });
 
-    const S = { mode: "explore", pinned: null, hovered: null, selected: null, round: 0, target: null, result: null };
+    const S = { mode: "explore", pinned: null, hovered: null, selected: null, round: 0, target: null, result: null,
+      filter: BG.root, rounds: BG.MYSTERY };
     BG.state = S;
     const label = n => (n.data.extinct ? "† " : "") + (n.data.common ? `${n.name} (${n.data.common})` : n.name);
     const source = ph => /wikimedia/.test(ph.o || "") ? "Wikimedia Commons" : "iNaturalist";
@@ -209,6 +215,15 @@
     };
 
     BG.selected = () => (S.mode === "explore" ? S.pinned : S.selected);
+    BG.pin = n => {
+      if (S.mode !== "explore") return;
+      S.pinned = n;
+      view.select(n);
+      crumbs(n);
+      photoIdx = 0;
+      showSpecies(n);
+    };
+    BG.roundClade = () => (S.mode === "guess" ? S.filter : BG.root);
 
     $("lock").onclick = () => {
       if (!S.selected || S.result) return;
@@ -232,7 +247,7 @@
     const roundPhotos = new Map();
     function photoFor(round) {
       if (!roundPhotos.has(round)) {
-        const m = BG.MYSTERY[round % BG.MYSTERY.length];
+        const m = S.rounds[round % S.rounds.length];
         const photos = BG.byName.get(m[2]).data.photos || [];
         roundPhotos.set(round, photos.length ? photos[Math.floor(Math.random() * photos.length)] : null);
       }
@@ -247,7 +262,7 @@
     }
 
     function newRound() {
-      const m = BG.MYSTERY[S.round % BG.MYSTERY.length];
+      const m = S.rounds[S.round % S.rounds.length];
       S.target = { common: m[0], species: m[1], leaf: BG.byName.get(m[2]) };
       S.selected = null;
       S.result = null;
@@ -279,8 +294,47 @@
       view.reveal(null);
       view.select(null);
       view.highlight(null);
-      view.reset();
+      view.reset(S.filter);
       preload(S.round + 1);
+    }
+
+    // Rounds can be limited to one clade: all animals, the clade being viewed, or a well-sampled named clade.
+    function setFilter(n) {
+      S.filter = n || BG.root;
+      S.rounds = BG.MYSTERY.filter(m => {
+        const l = BG.byName.get(m[2]);
+        return l && (S.filter === BG.root || l.ancestors().includes(S.filter));
+      });
+      if (!S.rounds.length) S.rounds = BG.MYSTERY;
+      S.round = 0;
+      roundPhotos.clear();
+      const count = $("round-count");
+      if (count) count.textContent = `${S.rounds.length.toLocaleString("en-US")} species to guess`;
+    }
+    function fillCladeMenu(current) {
+      const sel = $("round-clade");
+      if (!sel) return;
+      const named = [];
+      BG.root.eachBefore(n => {
+        if (n.children && !n.unnamed && n !== BG.root && n.nLeaves >= 25) named.push(n);
+      });
+      const items = [{ n: BG.root, label: "All animals" }];
+      if (current && current !== BG.root && !named.includes(current)) {
+        items.push({ n: current, label: `This view: ${current.name}` });
+      }
+      named.forEach(n => {
+        const depth = n.ancestors().filter(a => named.includes(a)).length - 1;
+        items.push({ n, label: `${"\u2003".repeat(depth)}${n.name}${n.data.common ? " (" + n.data.common + ")" : ""}` });
+      });
+      sel.innerHTML = "";
+      items.forEach((it, i) => {
+        const o = document.createElement("option");
+        o.value = i;
+        o.textContent = it.label;
+        if (it.n === current) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { setFilter(items[+sel.value].n); newRound(); };
     }
 
     function setMode(m) {
@@ -293,7 +347,13 @@
       S.hovered = null;
       crumbs(null);
       showSpecies(null);
-      if (m === "guess") newRound();
+      if (m === "guess") {
+        // play within whatever clade is being viewed
+        const current = view.root ? view.root() : BG.root;
+        setFilter(current);
+        fillCladeMenu(current);
+        newRound();
+      }
       else {
         S.result = null;
         S.selected = null;
