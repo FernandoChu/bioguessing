@@ -46,7 +46,7 @@
       </div>
       <section class="panel" id="explore-panel">
         <h2>Where you are</h2>
-        <p class="hint" id="crumb-hint">Hover or tap the tree to see a lineage. Click a species to see it, or a line below to zoom to that clade.</p>
+        <p class="hint" id="crumb-hint">Hover or tap the tree to see a lineage. Click a species or clade for details, double-click a clade to open it, or click a line below to open that clade.</p>
         <figure class="exphoto" id="ex-photo" hidden>
           <img id="ex-img" alt="" crossorigin="anonymous">
           <figcaption>

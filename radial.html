@@ -19,7 +19,7 @@
   <header>
     <p class="eyebrow">BioGuessing · prototype 1 of 4</p>
     <h1>Radial time tree</h1>
-    <p class="lede">Angle says which lineage, distance from the centre says when. Every clade is one unbroken slice of the circle. Click a clade to open it across the whole circle, and use ↑ to go back. Scroll or pinch to zoom in on detail.</p>
+    <p class="lede">Angle says which lineage, distance from the centre says when. Every clade is one unbroken slice of the circle. Double-click a clade to open it across the whole circle, and use ↑ to go back. Scroll or pinch to zoom in on detail.</p>
     <nav id="nav"></nav>
   </header>
   <div class="layout">
@@ -345,17 +345,13 @@ svg.on("pointermove", e => BG.hover(hit(e)))
   .on("click", e => {
     if (polar(e).r < rIn) { goUp(); return; }            // the centre goes up a level
     const n = hit(e);
-    if (!n) return;
-    if (BG.state.mode === "explore" && n.children) {     // explore: a clade opens across the circle
-      setRoot(n);
-      BG.pin(n);
-    } else {
-      BG.click(n);
-    }
+    if (n) BG.click(n);                                   // explore: show its information; rounds: pick it
   })
-  .on("dblclick", e => {                                  // rounds: double-click opens a clade
+  .on("dblclick", e => {                                  // double-click opens a clade across the circle
     const n = hit(e);
-    if (BG.state.mode === "guess" && n && n.children) setRoot(n);
+    if (!n || !n.children) return;
+    setRoot(n);
+    BG.pin(n);                                            // the two single clicks before may have unpinned it
   });
 
 BG.nav("radial.html");
@@ -381,8 +377,8 @@ BG.init({
   about: `<ol class="legend">
     <li><b>Angle is lineage.</b> Every clade is one continuous slice, so rim neighbours are related at exactly the split where their branches meet.</li>
     <li><b>Radius is time.</b> The centre is the base of the clade you are viewing and the rim is today, on a square-root scale. The rings are geological periods, or epochs for young clades.</li>
-    <li><b>Click a clade to open it</b> across the whole circle. ↑, the centre, or the lineage list go back up. Shaded wedges are clades too small to draw; zoom or open their parent to see inside.</li>
-    <li><b>Picking:</b> click near the rim for a specific group, or further in along a branch for an older, broader lineage. In a round, double-click a clade to open it.</li>
+    <li><b>Double-click a clade to open it</b> across the whole circle. ↑, the centre, or the lineage list go back up. Shaded wedges are clades too small to draw; zoom or open them to see inside.</li>
+    <li><b>Picking:</b> click near the rim for a specific group, or further in along a branch for an older, broader lineage.</li>
     ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. Turning them off also hides them from rounds.</li>` : ""}
   </ol>
   <p class="hint">${BG.REAL
