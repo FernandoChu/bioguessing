@@ -98,6 +98,7 @@
         </div>
         <span class="hint">Branch lengths</span>
         ${seg("treeLengths", [["time", "To time scale"], ["equal", "Evenly spaced"]])}
+        <span class="hint" data-show="treeLengths=time">Splits too close in time to read are spaced out slightly.</span>
         ${check("treeThumbs", "Photos on collapsed groups")}
       </section>
       <section>

@@ -78,18 +78,42 @@
       const tmax = tmaxFor(viewRoot);
       let xTip = 0, X = null;
       if (timed) {
-        // positions follow time; tips of living species line up at today
+        // positions follow time, but a split is never drawn closer to its parent than its name needs:
+        // bursts of splits (the Cambrian, the bird radiation) are spaced out just enough to read.
+        // Tips of living species line up at today; if spacing pushes splits into them, the tree widens.
         const labelW = Math.min(420, Math.max(200, cw * 0.42));
-        xTip = Math.max(x0 + 120, cw - labelW);
-        X = t => x0 + (xTip - x0) * (1 - Math.sqrt(Math.max(0, Math.min(t, tmax)) / tmax));
+        const gap = n => (!tipOf.has(n) && n.children && !n.unnamed) ? textW(n.name, CLADE_FS) + 16 : 14;
+        let right = Math.max(x0 + 120, cw - labelW);
+        for (let pass = 0; pass < 3; pass++) {
+          xTip = right;
+          X = t => x0 + (xTip - x0) * (1 - Math.sqrt(Math.max(0, Math.min(t, tmax)) / tmax));
+          let furthest = 0;
+          (function place(n, parentX) {
+            const p = pos.get(n);
+            const earliest = parentX === null ? -Infinity : parentX + gap(n);
+            p.label = undefined;
+            if (tipOf.has(n) && n.children) {
+              p.x = Math.max(X(n.age), earliest);
+              p.end = Math.max(xTip, p.x + 20);
+              furthest = Math.max(furthest, p.x + 20);
+            } else if (!n.children) {
+              p.x = Math.max(X(n.data.extinct ? n.data.la : 0), earliest);
+              p.end = p.x;
+              p.label = Math.max(xTip, p.x) + 8;
+              furthest = Math.max(furthest, p.x);
+            } else {
+              p.x = Math.max(X(n.age), earliest);
+              p.end = p.x;
+              p.stretched = p.x > X(n.age) + 1;
+              furthest = Math.max(furthest, p.x + 14);
+              n.children.forEach(c => place(c, p.x));
+            }
+            if (p.label === undefined) p.label = p.end + 8;
+          })(viewRoot, null);
+          if (furthest <= xTip) break;
+          right = furthest + 10;   // spacing reached the tips: widen and lay out again
+        }
         L = { X };
-        (function place(n) {
-          const p = pos.get(n);
-          if (tipOf.has(n) && n.children) { p.x = X(n.age); p.end = xTip; }
-          else if (!n.children) { p.x = X(n.data.extinct ? n.data.la : 0); p.end = p.x; p.label = xTip + 8; }
-          else { p.x = X(n.age); p.end = p.x; n.children.forEach(place); }
-          if (p.label === undefined) p.label = p.end + 8;
-        })(viewRoot);
       } else {
         // evenly spaced: every branch is as long as the name written on it
         const len = n => (!tipOf.has(n) && n.children && !n.unnamed) ? Math.max(24, textW(n.name, CLADE_FS) + 16) : 18;
