@@ -133,8 +133,8 @@ header{position:relative}
 .settings .stack{display:flex;flex-direction:column;gap:6px}
 .settings .seg{align-self:flex-start;flex-wrap:wrap}
 .settings .tree-settings.inactive{opacity:.6}
-.settings .check{display:flex;gap:9px;align-items:center;cursor:pointer}
-.settings .check input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.check{display:flex;gap:9px;align-items:center;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px;margin:0;flex:none}
 .viewing button{width:30px;height:30px;padding:0;font-size:16px;line-height:1}
 .viewing .vn{font-family:var(--serif);font-weight:600}
 .viewing .vc{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

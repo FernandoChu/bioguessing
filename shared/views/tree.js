@@ -46,7 +46,9 @@
     const countText = n => {
       if (n.children) return `${n.data.total ? "~" + BG.fmtCount(n.data.total) + " species" : n.nLeaves + " species"} · ${n.nLeaves} on the map`;
       const g = groupOf(n);
-      return g ? `~${BG.fmtCount(g.total)} species · 1 on the map: ${(n.data.extinct ? "† " : "") + n.name}` : "";
+      if (!g) return "";
+      // the example species' name is a description too: hidden with the other hints
+      return `~${BG.fmtCount(g.total)} species · 1 on the map` + (S("commonNames") ? `: ${(n.data.extinct ? "† " : "") + n.name}` : "");
     };
     function tipLabelWidth(n) {
       const main = textW(tipName(n), TIP_FS) + (tipCommon(n) ? textW("  " + tipCommon(n), COMMON_FS) : 0);

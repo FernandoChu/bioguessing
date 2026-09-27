@@ -109,6 +109,7 @@
             <select id="pa-clade"></select>
             <small class="hint" id="pa-count"></small>
           </label>
+          <label class="check"><input type="checkbox" id="pa-hard"><span>Hide photos and common names on the map (harder)</span></label>
         </section>
         <section class="panel">
           <h2>Which animal is this?</h2>
@@ -132,6 +133,15 @@
           <button id="pa-next">Next animal</button>
         </section>`;
       $("pa-lock").onclick = lockIn;
+      // a shortcut for the two map-hint settings; kept in sync when they change in Settings
+      const syncHard = () => { $("pa-hard").checked = !BGSettings.get("treeThumbs") && !BGSettings.get("commonNames"); };
+      $("pa-hard").onchange = e => {
+        const hard = e.target.checked;   // read once: the first change re-syncs the box before the second
+        BGSettings.set("treeThumbs", !hard);
+        BGSettings.set("commonNames", !hard);
+      };
+      BGSettings.on(syncHard);
+      syncHard();
       $("pa-next").onclick = () => { S.round++; newRound(); };
     },
 

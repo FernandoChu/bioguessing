@@ -7,12 +7,12 @@
     view: "radial",            // "radial" | "tree"
     showExtinct: true,
     showEras: true,            // geological periods / epochs
-    commonNames: true,         // common names next to scientific names on tips
+    commonNames: true,         // hint: common names and descriptions ("sea gooseberries", "1 on the map: ...")
     treeCut: "named",          // "named": count named levels; "time": collapse splits younger than treeAge
     treeDepth: 3,              // named levels shown below the current clade; 0 = everything
     treeAge: 100,              // My, for treeCut "time"
     treeLengths: "time",       // "time": branch lengths to scale; "equal": evenly spaced
-    treeThumbs: true,          // photos on collapsed groups
+    treeThumbs: true,          // hint: photos on the map (tree view)
   };
   let values = { ...DEFAULTS };
   try {

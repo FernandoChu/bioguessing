@@ -100,11 +100,15 @@
         ${seg("treeLengths", [["time", "To time scale"], ["spaced", "Spaced where crowded"], ["equal", "Evenly spaced"]])}
         <span class="hint" data-show="treeLengths=time">Exact dates. Where splits are crowded, some names are hidden; hover a branch to see it.</span>
         <span class="hint" data-show="treeLengths=spaced">Crowded splits are pushed apart so every name fits. Positions show the order of splits, not their dates, so periods are hidden.</span>
-        ${check("treeThumbs", "Photos on collapsed groups")}
       </section>
       <section>
-        <h3>Labels and time</h3>
-        ${check("commonNames", "Show common names")}
+        <h3>Hints on the map</h3>
+        ${check("treeThumbs", "Photos")}
+        ${check("commonNames", "Common names and descriptions")}
+        <span class="hint">Turn these off to make games like Place the animal harder: only scientific names and species counts stay on the map.</span>
+      </section>
+      <section>
+        <h3>Time</h3>
         ${check("showEras", "Show geological periods")}
       </section>
       ${BG.hasExtinct ? `<section>
