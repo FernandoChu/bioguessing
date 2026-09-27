@@ -92,6 +92,23 @@ aside{display:flex;flex-direction:column;gap:14px}
 .field select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;max-width:100%}
 .stage{display:flex;flex-direction:column;gap:8px}
 .viewing{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 10px 4px 4px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.vspacer{flex:1}
+.viewing #maximize,.viewing #panel-toggle{width:auto;height:30px;padding:0 10px;font-size:13px;font-weight:600;white-space:nowrap}
+.viewing #panel-toggle[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+/* maximized: the map fills the window */
+body.maximized{overflow:hidden}
+body.maximized .wrap > header{display:none}
+body.maximized .layout{position:fixed;inset:0;z-index:30;background:var(--bg);padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top, 0px));padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));grid-template-columns:minmax(0,1fr);align-items:stretch}
+body.maximized.show-panel .layout{grid-template-columns:minmax(0,1fr) 340px}
+body.maximized aside{display:none;overflow:auto;min-height:0}
+body.maximized.show-panel aside{display:flex}
+body.maximized .stage{max-width:none;height:100%;min-height:0;justify-self:stretch}
+body.maximized .stage > svg{flex:1 1 0;min-height:0;width:auto;max-width:100%;height:auto;margin:0 auto}
+body.maximized .treeview{flex:1 1 0;height:auto;min-height:0}
+@media (max-width:860px){
+  body.maximized.show-panel .layout{grid-template-columns:minmax(0,1fr)}
+  body.maximized.show-panel aside{position:fixed;top:0;right:0;bottom:0;width:min(360px,90vw);z-index:31;background:var(--bg);padding:12px;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.2)}
+}
 /* tree view */
 .treeview{position:relative;width:100%;height:min(80vh,900px);min-height:420px;overflow:auto;scrollbar-gutter:stable;background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .tv-axis{position:sticky;top:0;z-index:1;background:var(--surface);border-bottom:1px solid var(--line)}

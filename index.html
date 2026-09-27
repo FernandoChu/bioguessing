@@ -29,6 +29,9 @@
         <button id="up" aria-label="Go up to the parent clade">↑</button>
         <span class="vn" id="view-name"></span>
         <span class="vc" id="view-info"></span>
+        <span class="vspacer"></span>
+        <button id="panel-toggle" aria-pressed="false" hidden>Panel</button>
+        <button id="maximize" aria-pressed="false" title="Fill the window with the map (Esc to restore)">⛶ Maximize</button>
       </div>
       <svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Radial time-calibrated tree of animals"></svg>
       <div id="treeview" class="treeview" hidden></div>
@@ -103,6 +106,27 @@ const view = {
   marks(spec) { shared.marks = spec; V().marks(spec); },
 };
 $("up").onclick = () => V().goUp();
+
+// Maximize: the map fills the window, for either view; the side panel can be brought back beside it
+function setMaximized(on) {
+  document.body.classList.toggle("maximized", on);
+  $("maximize").setAttribute("aria-pressed", on);
+  $("maximize").textContent = on ? "Restore" : "⛶ Maximize";
+  $("maximize").title = on ? "Back to the normal page (Esc)" : "Fill the window with the map (Esc to restore)";
+  $("panel-toggle").hidden = !on;
+  // games need their panel, so it starts open while playing
+  setPanel(on && BG.state && BG.state.mode === "play");
+}
+function setPanel(on) {
+  document.body.classList.toggle("show-panel", on);
+  $("panel-toggle").setAttribute("aria-pressed", on);
+}
+$("maximize").onclick = () => setMaximized(!document.body.classList.contains("maximized"));
+$("panel-toggle").onclick = () => setPanel(!document.body.classList.contains("show-panel"));
+document.addEventListener("keydown", e => {
+  const settingsOpen = !$("settings").hidden;
+  if (e.key === "Escape" && !settingsOpen && document.body.classList.contains("maximized")) setMaximized(false);
+});
 BGSettings.on(key => { if (key === "view" && BGSettings.get("view") !== current) showView(BGSettings.get("view")); });
 
 BG.init(view, {
