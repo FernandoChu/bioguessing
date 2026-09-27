@@ -44,7 +44,10 @@
 
     function layout() {
       const cw = Math.max(320, el.clientWidth || 700);
-      const timed = S("treeLengths") === "time";
+      // "time": exact positions; "spaced": time order, but crowded splits pushed apart so names fit;
+      // "equal": evenly spaced
+      const lengths = S("treeLengths");
+      const timed = lengths !== "equal", exact = lengths === "time";
       const tips = [], shown = new Set(), tipOf = new Set();
       (function walk(n, level) {
         shown.add(n);
@@ -78,11 +81,11 @@
       const tmax = tmaxFor(viewRoot);
       let xTip = 0, X = null;
       if (timed) {
-        // positions follow time, but a split is never drawn closer to its parent than its name needs:
-        // bursts of splits (the Cambrian, the bird radiation) are spaced out just enough to read.
+        // positions follow time. Exact mode only keeps nested splits a few pixels apart so their lines
+        // do not coincide; spaced mode pushes crowded splits apart until each name fits on its branch.
         // Tips of living species line up at today; if spacing pushes splits into them, the tree widens.
         const labelW = Math.min(420, Math.max(200, cw * 0.42));
-        const gap = n => (!tipOf.has(n) && n.children && !n.unnamed) ? textW(n.name, CLADE_FS) + 16 : 14;
+        const gap = n => !exact && (!tipOf.has(n) && n.children && !n.unnamed) ? textW(n.name, CLADE_FS) + 16 : exact ? 8 : 14;
         let right = Math.max(x0 + 120, cw - labelW);
         for (let pass = 0; pass < 3; pass++) {
           xTip = right;
@@ -129,7 +132,7 @@
       }
       const needed = Math.max(...tips.map(t => pos.get(t).label + tipLabelWidth(t))) + 14;
       const W = Math.max(cw, Math.ceil(needed));
-      L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X: X || (() => 0), timed };
+      L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X: X || (() => 0), timed, exact };
       L.color = BG.colorGroups(viewRoot, n => tipOf.has(n));
     }
 
@@ -147,7 +150,7 @@
       axis.attr("width", W).attr("height", 30).attr("viewBox", `0 0 ${W} 30`);
 
       // geological periods (time scale only)
-      const eras = timed && S("showEras") ? (L.tmax < 70 ? EPOCHS : BG.ERAS).filter(d => d[2] < L.tmax) : [];
+      const eras = L.exact && S("showEras") ? (L.tmax < 70 ? EPOCHS : BG.ERAS).filter(d => d[2] < L.tmax) : [];
       gEra.selectAll("rect").data(eras, d => d[0]).join("rect").attr("class", (d, i) => i % 2 ? "band" : "band off")
         .attr("x", d => X(Math.min(d[1], L.tmax))).attr("width", d => X(d[2]) - X(Math.min(d[1], L.tmax)))
         .attr("y", 0).attr("height", H);
@@ -158,8 +161,9 @@
         const w = X(d[2]) - X(Math.min(d[1], L.tmax));
         const text = d[0].length * 6.3 < w - 4 ? d[0] : w > 24 ? d[0].slice(0, 3) : "";
         return { key: d[0], x: (X(d[2]) + X(Math.min(d[1], L.tmax))) / 2, text };
-      }).concat(timed ? [{ key: "today", x: xTip + 4, text: "today →", start: true }]
-        : [{ key: "note", x: 14, text: "Branches evenly spaced (not to time scale)", start: true }]);
+      }).concat(L.exact ? [{ key: "today", x: xTip + 4, text: "today →", start: true }]
+        : [{ key: "note", x: 14, text: timed ? "Crowded splits spaced out: order of splits, not to time scale"
+          : "Branches evenly spaced (not to time scale)", start: true }]);
       axis.selectAll("text").data(axisLabels, d => d.key).join("text").attr("class", "eralabel")
         .attr("x", d => d.x).attr("y", 15).attr("text-anchor", d => d.start ? "start" : "middle")
         .style("font-size", "11px").text(d => d.text);
@@ -188,7 +192,7 @@
         .attr("style", n => `--c:${colorOf(n)}`)
         .attr("d", n => { const p = pos.get(n), h = p.h / 2 - 5; return `M${f1(p.x)},${f1(p.y)}L${f1(p.end)},${f1(p.y - h)}V${f1(p.y + h)}Z`; });
       gBranch.selectAll("circle").data([...L.shown].filter(n => n.children && !L.tipOf.has(n)), n => n.name).join("circle")
-        .attr("class", "dot-c").attr("style", n => `--c:${colorOf(n)}`)
+        .attr("class", "dot-c").attr("data-name", n => n.name).attr("style", n => `--c:${colorOf(n)}`)
         .attr("cx", n => pos.get(n).x).attr("cy", n => pos.get(n).y).attr("r", 2.6);
 
       // tip labels: name and common name, a count for cut-off groups, and photos after the text
@@ -272,7 +276,7 @@
           lines.push({ d: polyD(routeUp(m.from, m.via).concat(routeUp(m.to, m.via).reverse())), kind: (m.alt ? "alt " : "") + (m.kind || "") });
         });
         (marks.pins || []).forEach(m => pinAt(m.node, m.kind, m.label));
-        (marks.rings || []).forEach(m => { if (L.timed && m.age <= L.tmax) rings.push({ x: L.X(m.age), kind: m.kind || "", label: m.label }); });
+        (marks.rings || []).forEach(m => { if (L.exact && m.age <= L.tmax) rings.push({ x: L.X(m.age), kind: m.kind || "", label: m.label }); });
       } else if (result) {
         const r = result;
         if (!r.same) area(r.anc, "", 2.5);

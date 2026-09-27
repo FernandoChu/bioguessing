@@ -97,8 +97,9 @@
           </label>
         </div>
         <span class="hint">Branch lengths</span>
-        ${seg("treeLengths", [["time", "To time scale"], ["equal", "Evenly spaced"]])}
-        <span class="hint" data-show="treeLengths=time">Splits too close in time to read are spaced out slightly.</span>
+        ${seg("treeLengths", [["time", "To time scale"], ["spaced", "Spaced where crowded"], ["equal", "Evenly spaced"]])}
+        <span class="hint" data-show="treeLengths=time">Exact dates. Where splits are crowded, some names are hidden; hover a branch to see it.</span>
+        <span class="hint" data-show="treeLengths=spaced">Crowded splits are pushed apart so every name fits. Positions show the order of splits, not their dates, so periods are hidden.</span>
         ${check("treeThumbs", "Photos on collapsed groups")}
       </section>
       <section>
