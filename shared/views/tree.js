@@ -131,29 +131,43 @@
         }
         L = { X };
       } else {
-        // evenly spaced: every branch is at least as long as the name written on it, and every branch
-        // gets the same extra length, chosen so the widest row ends at the right edge of the panel
+        // evenly spaced, as a cladogram: every tip ends at the same x (so nothing looks extinct), each
+        // split sits as far left as the levels below it need, and every branch is at least as long as
+        // the name written on it plus one shared extra length, chosen so the root starts at the left
         const len = n => (!tipOf.has(n) && n.children && !n.unnamed) ? Math.max(24, textW(n.name, CLADE_FS) + 16) : 18;
-        const base = new Map(), steps = new Map();
-        (function d(n, x, k) {
-          base.set(n, x);
-          steps.set(n, k);
-          if (!tipOf.has(n)) n.children.forEach(c => d(c, x + len(c), k + 1));
-        })(viewRoot, 0, 0);
-        const tail = t => (t.children ? WEDGE : 0) + 8 + tipLabelWidth(t);
-        let extra = Infinity;
-        tips.forEach(t => {
-          const k = steps.get(t);
-          if (k > 0) extra = Math.min(extra, (cw - 30 - x0 - tail(t) - base.get(t)) / k);
-        });
-        extra = Math.max(0, extra === Infinity ? 0 : extra);
-        (function place(n, x) {
+        const tailOf = t => 8 + tipLabelWidth(t);
+        const maxTail = Math.max(...tips.map(tailOf));
+        xTip = Math.max(x0 + 80, cw - 30 - maxTail);
+        const need = e => {            // distance from each node to the tips' line, for extra length e
+          const m = new Map();
+          (function f(n) {
+            let v;
+            if (tipOf.has(n)) v = n.children ? WEDGE : 0;
+            else v = Math.max(...n.children.map(c => len(c) + e + f(c)));
+            m.set(n, v);
+            return v;
+          })(viewRoot);
+          return m;
+        };
+        let extra = 0, dist = need(0);
+        if (dist.get(viewRoot) > xTip - x0) {
+          xTip = x0 + dist.get(viewRoot);          // names do not fit: widen instead of overlapping
+        } else {
+          let lo = 0, hi = cw;                     // the largest extra length that still fits
+          for (let i = 0; i < 30; i++) {
+            const mid = (lo + hi) / 2;
+            if (need(mid).get(viewRoot) <= xTip - x0) lo = mid; else hi = mid;
+          }
+          extra = lo;
+          dist = need(extra);
+        }
+        (function place(n) {
           const p = pos.get(n);
-          p.x = x;
-          p.end = tipOf.has(n) && n.children ? x + WEDGE : x;
-          p.label = p.end + 8;
-          if (!tipOf.has(n)) n.children.forEach(c => place(c, x + len(c) + extra));
-        })(viewRoot, x0);
+          p.x = xTip - dist.get(n);
+          p.end = tipOf.has(n) ? xTip : p.x;
+          p.label = xTip + 8;
+          if (!tipOf.has(n)) n.children.forEach(place);
+        })(viewRoot);
         xTip = Math.max(...tips.map(t => pos.get(t).end));
       }
       const needed = Math.max(...tips.map(t => pos.get(t).label + tipLabelWidth(t))) + 14;
@@ -193,7 +207,7 @@
         : [{ key: "note", x: 14, text: timed ? "Crowded splits spaced out: order of splits, not to time scale"
           : "Branches evenly spaced (not to time scale)", start: true }]);
       axis.selectAll("text").data(axisLabels, d => d.key).join("text").attr("class", "eralabel")
-        .attr("x", d => d.x).attr("y", 15).attr("text-anchor", d => d.start ? "start" : "middle")
+        .attr("x", d => d.x).attr("y", 15).style("text-anchor", d => d.start ? "start" : "middle")
         .style("font-size", "11px").text(d => d.text);
 
       // branches
