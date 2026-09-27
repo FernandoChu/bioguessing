@@ -8,9 +8,14 @@ Play: https://fernandochu.github.io/bioguessing/
 
 ## How it works
 
-`index.html` draws the tree radially: angle is lineage and distance from the centre is time.
-Double-click a clade to open it across the whole circle. Extinct animals from the Mesozoic
-onward can be switched on or off.
+The map has two views, chosen in **⚙ Settings**:
+
+- **Radial** (`shared/views/radial.js`): angle is lineage and distance from the centre is time.
+- **Tree** (`shared/views/tree.js`): a left-to-right tree of the clade being viewed, cut off after a
+  number of named levels or at an age, with branch lengths to time scale or evenly spaced.
+
+Double-click a clade to open it in either view. The settings (`shared/settings.js`, saved in the
+browser) also cover common names, geological periods and extinct animals from the Mesozoic onward.
 
 The page has two modes. **Explore** is the map on its own. **Play** lists the games; each one
 is a file in `shared/games/` that calls `BG.registerGame(...)` (see the comment at the top of

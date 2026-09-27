@@ -25,13 +25,14 @@
   </header>
   <div class="layout">
     <div class="stage">
-      <svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Radial time-calibrated tree of animals"></svg>
       <div class="viewing" id="viewing">
         <button id="up" aria-label="Go up to the parent clade">↑</button>
         <span class="vn" id="view-name"></span>
         <span class="vc" id="view-info"></span>
       </div>
-      <div class="zoomctl">
+      <svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Radial time-calibrated tree of animals"></svg>
+      <div id="treeview" class="treeview" hidden></div>
+      <div class="zoomctl" id="zoomctl">
         <button id="zin" aria-label="Zoom in">+</button>
         <button id="zout" aria-label="Zoom out">−</button>
         <button id="zreset" aria-label="Reset view">⤢</button>
@@ -43,8 +44,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="data/tree.js"></script>
+<script src="shared/settings.js"></script>
 <script src="shared/data.js"></script>
 <script src="shared/ui.js"></script>
+<script src="shared/views/radial.js"></script>
+<script src="shared/views/tree.js"></script>
 <script src="shared/games/common.js"></script>
 <script src="shared/games/place.js"></script>
 <script src="shared/games/trio.js"></script>
@@ -53,373 +57,73 @@
 <script src="shared/games/whichclade.js"></script>
 <script src="shared/games/build.js"></script>
 <script>
-const { root, nodes, leaves } = BG;
-const svg = d3.select("#svg");
-const C = 500, rIn = 34, rOut = 330;
-const GAP = 16 * Math.PI / 180, A0 = -Math.PI / 2 + GAP / 2, SPAN = 2 * Math.PI - GAP;
-const MIN_PX_PER_CHILD = 44;   // a clade opens when its rim arc gives each child this much room
-// finer time rings for views younger than the Cenozoic
-const EPOCHS = [["Paleocene", 66, 56], ["Eocene", 56, 33.9], ["Oligocene", 33.9, 23], ["Miocene", 23, 5.33],
-  ["Pliocene", 5.33, 2.58], ["Pleistocene", 2.58, 0.0117]];
+// Two views of the same tree; the one chosen in the settings is shown. The page shell and the games
+// talk to `view`, which forwards to the active one and replays selection and marks when switching.
+const $ = id => document.getElementById(id);
+let current = BGSettings.get("view") === "tree" ? "tree" : "radial";
+const shared = { hover: null, sel: null, result: null, marks: null };
 
-// Global layout: every species gets a share of [0, 1] in tree order, so every clade is one interval.
-// The view shows one clade's interval [w0, w1] across the whole circle, with time scaled to its age.
-const total = d3.sum(leaves, l => l.value);
-let acc = 0;
-leaves.forEach(l => { l.g0 = acc / total; acc += l.value; l.g1 = acc / total; });
-root.eachAfter(n => { if (n.children) { n.g0 = n.children[0].g0; n.g1 = n.children[n.children.length - 1].g1; } });
-
-const tmaxFor = n => n === root ? BG.MAX_AGE : Math.max(n.age * 1.12, 0.05);
-let viewRoot = root, drawRoot = root, V = { w0: 0, w1: 1, tmax: BG.MAX_AGE }, viewLeaves = leaves, anim = null;
-const ang = g => A0 + (g - V.w0) / (V.w1 - V.w0) * SPAN;
-const clampA = a => Math.max(A0, Math.min(A0 + SPAN, a));
-const v0 = n => clampA(ang(n.g0)), v1 = n => clampA(ang(n.g1));
-const rt = t => rOut - (rOut - rIn) * Math.sqrt(Math.max(0, Math.min(t, V.tmax)) / V.tmax);
-const tAt = r => V.tmax * ((rOut - r) / (rOut - rIn)) ** 2;
-
-const layer = name => svg.append("g").attr("class", name);
-const gEra = layer("eras"), gArea = layer("areas"), gWedge = layer("wedges"), gBranch = layer("branches"),
-  gLine = layer("lines"), gLabel = layer("labels"), gEraLbl = layer("eralabels"), gPin = layer("pins");
-
-let T = d3.zoomIdentity, px = 0.7, showEras = true;
-let hoverN = null, selN = null, result = null;
-// Marks a game can put on the map: { areas: [{node, strong, kind}], routes: [{from, to, via, alt, kind}],
-// pins: [{node, kind, label}], rings: [{age, kind, label}] }. Shown instead of hover and selection while set.
-let marks = null;
-// geometry of the current frame
-let c = [C, C], k = 1, s = 0.7;
-const u = v => v / px;                                   // screen px -> viewBox units
-const P = (a, r) => [c[0] + r * k * Math.cos(a), c[1] + r * k * Math.sin(a)];
-const f2 = p => p[0].toFixed(1) + "," + p[1].toFixed(1);
-
-function arcD(R, a0, a1) {
-  const p0 = P(a0, R), p1 = P(a1, R);
-  return "M" + f2(p0) + `A${(R * k).toFixed(1)},${(R * k).toFixed(1)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${f2(p1)}`;
+function updateViewing(n) {
+  $("view-name").textContent = n.name;
+  const bits = [n.data.common, `${n.nLeaves.toLocaleString("en-US")} species on the map`, `~${BG.fmtAge(n.age)} My`].filter(Boolean);
+  $("view-info").textContent = bits.join(" · ");
+  $("up").disabled = n === (BG.roundClade ? BG.roundClade() : BG.root);
 }
-function sectorD(a0, a1, r0, r1) {
-  return arcD(r1, a0, a1) + "L" + f2(P(a1, r0)) +
-    `A${(r0 * k).toFixed(1)},${(r0 * k).toFixed(1)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 0 ${f2(P(a0, r0))}Z`;
-}
-function ringD(r0, r1) {
-  const one = r => { const R = (r * k).toFixed(1); return `M${c[0] + r * k},${c[1]}A${R},${R} 0 1 1 ${c[0] - r * k},${c[1]}A${R},${R} 0 1 1 ${c[0] + r * k},${c[1]}Z`; };
-  return one(r1) + one(r0);
-}
-// extinct species end at their last appearance instead of at today's rim
-const nodeR = n => n.children ? rt(n.age) : n.data.extinct ? rt(n.data.la) : rOut;
-const angOf = n => n.walked ? n.ang : (v0(n) + v1(n)) / 2;
-const inView = n => n === drawRoot || n.ancestors().includes(drawRoot);
+const views = {
+  radial: BG.views.radial({ svg: $("svg"), onRoot: n => { if (current === "radial") updateViewing(n); } }),
+  tree: BG.views.tree({ el: $("treeview"), onRoot: n => { if (current === "tree") updateViewing(n); } }),
+};
+const V = () => views[current];
 
-function render() {
-  px = BG.pxPerUnit(svg.node());
-  k = T.k; s = k * px; c = T.apply([C, C]);
-
-  // level of detail: open a clade only if its children get enough room on the rim
-  nodes.forEach(n => { n.shown = false; n.open = false; n.walked = false; });
-  (function walk(n) {
-    if (v1(n) - v0(n) <= 1e-6) return;          // outside the visible window
-    n.shown = n.walked = true;
-    n.open = !!n.children && (n === drawRoot || (v1(n) - v0(n)) * rOut * s >= MIN_PX_PER_CHILD * n.children.length);
-    if (n.open) n.children.forEach(walk);
-  })(drawRoot);
-  drawRoot.eachAfter(n => {
-    if (!n.walked) return;
-    const kids = n.open ? n.children.filter(ch => ch.walked) : [];
-    n.ang = kids.length ? (kids[0].ang + kids[kids.length - 1].ang) / 2 : (v0(n) + v1(n)) / 2;
-  });
-
-  // geological periods (or epochs, for young clades) as rings
-  const eras = (V.tmax < 70 ? EPOCHS : BG.ERAS).filter(d => d[2] < V.tmax);
-  const bands = showEras ? eras : [];
-  gEra.selectAll("path").data(bands, d => d[0]).join("path")
-    .attr("class", (d, i) => i % 2 ? "band" : "band off").attr("fill-rule", "evenodd")
-    .attr("d", d => ringD(rt(d[1]), rt(d[2])));
-  gEra.selectAll("circle").data(bands, d => d[0]).join("circle").attr("class", "ring")
-    .attr("cx", c[0]).attr("cy", c[1]).attr("r", d => rt(d[2]) * k).style("stroke-width", u(1) + "px");
-  const eraLbl = [];
-  bands.forEach(d => {
-    const r0 = rt(d[1]), r1 = rt(d[2]), thick = (r1 - r0) * s;
-    if (thick < 11) return;
-    const gapPx = GAP * (r0 + r1) / 2 * s;
-    const fsPx = Math.min(11, thick * 0.7);
-    const text = d[0].length * fsPx * 0.6 < gapPx * 1.5 ? d[0] : d[0].slice(0, 3) + ".";
-    eraLbl.push({ text, p: P(-Math.PI / 2, (r0 + r1) / 2), fs: u(fsPx) });
-  });
-  eraLbl.push({ text: "today", p: P(-Math.PI / 2, rOut + 12), fs: u(11) });
-  gEraLbl.selectAll("text").data(eraLbl).join("text").attr("class", "eralabel halo")
-    .attr("x", d => d.p[0]).attr("y", d => d.p[1]).style("font-size", d => d.fs + "px")
-    .style("stroke-width", u(3) + "px").text(d => d.text);
-
-  // collapsed clades drawn as wedges
-  const shown = nodes.filter(n => n.shown);
-  const collapsed = shown.filter(n => n.children && !n.open);
-  gWedge.selectAll("path").data(collapsed, n => n.name).join("path").attr("class", "wedge fill-h")
-    .attr("style", n => `--h:${n.hue.toFixed(1)}`)
-    .attr("d", n => sectorD(v0(n) + 0.004, v1(n) - 0.004, rt(n.age), rOut));
-
-  // branches: radial stems plus an arc joining each open clade's children
-  const segs = [];
-  shown.forEach(n => {
-    const r0 = n.parent ? rt(n.parent.age) : rIn;
-    segs.push({ key: "s" + n.name, h: n.hue, d: "M" + f2(P(n.ang, r0)) + "L" + f2(P(n.ang, nodeR(n))), w: 1.7 });
-    if (!n.children && n.data.extinct && nodeR(n) < rOut - 1) {
-      segs.push({ key: "g" + n.name, ghost: true, d: "M" + f2(P(n.ang, nodeR(n))) + "L" + f2(P(n.ang, rOut)), w: 1 });
-    }
-    if (n.open) {
-      const kids = n.children.filter(ch => ch.walked);
-      if (kids.length) segs.push({ key: "a" + n.name, h: n.hue, d: arcD(rt(n.age), kids[0].ang, kids[kids.length - 1].ang), w: 1.7 });
-    }
-  });
-  gBranch.selectAll("path").data(segs, d => d.key).join("path").attr("class", d => d.ghost ? "ghost" : "stroke-h")
-    .attr("style", d => d.ghost ? null : `--h:${d.h.toFixed(1)}`).attr("d", d => d.d)
-    .style("stroke-width", d => u(d.w) + "px").style("stroke-dasharray", d => d.ghost ? `${u(1)} ${u(4)}` : null);
-  const ends = shown.filter(n => !n.children && n.data.extinct && (v1(n) - v0(n)) * rOut * s >= 6);
-  gBranch.selectAll("text.dagger").data(ends, n => n.name).join("text").attr("class", "dagger eralabel")
-    .attr("x", n => P(n.ang, nodeR(n) + 6)[0]).attr("y", n => P(n.ang, nodeR(n) + 6)[1])
-    .style("font-size", u(11) + "px").text("†");
-  gBranch.selectAll("circle").data(shown.filter(n => n.open), n => n.name).join("circle").attr("class", "dot-h")
-    .attr("style", n => `--h:${n.hue.toFixed(1)}`)
-    .attr("cx", n => P(n.ang, rt(n.age))[0]).attr("cy", n => P(n.ang, rt(n.age))[1]).attr("r", u(2.6));
-
-  // rim labels for tips and collapsed clades
-  const tips = shown.filter(n => !n.open && (v1(n) - v0(n)) * rOut * s >= 11);
-  gLabel.selectAll("text.tlabel").data(tips, n => n.name).join(enter => {
-    const t = enter.append("text").attr("class", "tlabel halo");
-    t.append("tspan").attr("class", "n");
-    t.append("tspan").attr("class", "c");
-    return t;
-  })
-    .attr("transform", n => {
-      const p = P(n.ang, rOut + 7), deg = n.ang * 180 / Math.PI, flip = Math.cos(n.ang) < 0;
-      return `translate(${f2(p)}) rotate(${(flip ? deg + 180 : deg).toFixed(2)})`;
-    })
-    .attr("text-anchor", n => Math.cos(n.ang) < 0 ? "end" : "start")
-    .style("stroke-width", u(3) + "px")
-    .each(function (n) {
-      const t = d3.select(this), roomy = (v1(n) - v0(n)) * rOut * s >= 15;
-      t.select(".n").classed("sp", BG.REAL && !n.children).style("font-size", u(12) + "px")
-        .text((n.data.extinct ? "† " : "") + n.name);
-      t.select(".c").style("font-size", u(11) + "px")
-        .text(n.children
-          ? (n.data.total ? `  ~${BG.fmtCount(n.data.total)} species` : `  +${n.nLeaves} ${BG.leafNoun}`)
-          : roomy && n.data.common ? "  " + n.data.common : "");
-    });
-
-  // labels for open clades, placed at their node; bigger clades win overlaps
-  const taken = [], cl = [];
-  shown.filter(n => n.open && n !== drawRoot && !n.unnamed).sort((a, b) => b.nLeaves - a.nLeaves).forEach(n => {
-    const p = P(n.ang, rt(n.age)), fsPx = 10.5;
-    const w = n.name.length * fsPx * 0.72 / px, h = fsPx * 1.3 / px;
-    const box = [p[0] - w / 2, p[1] - h - u(4), p[0] + w / 2, p[1] - u(4)];
-    if (box[2] < 0 || box[0] > 1000 || box[3] < 0 || box[1] > 1000) return;
-    if (taken.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) return;
-    taken.push(box);
-    cl.push({ n, x: p[0], y: (box[1] + box[3]) / 2 });
-  });
-  gLabel.selectAll("text.clabel").data(cl, d => d.n.name).join("text").attr("class", "clabel halo")
-    .attr("x", d => d.x).attr("y", d => d.y).attr("text-anchor", "middle")
-    .style("font-size", u(10.5) + "px").style("letter-spacing", u(0.9) + "px").style("stroke-width", u(3) + "px")
-    .text(d => d.n.name);
-
-  drawMarks();
+function showView(name) {
+  const from = V().root();
+  V().show(false);
+  current = name;
+  $("svg").style.display = name === "radial" ? "" : "none";
+  $("treeview").hidden = name !== "tree";
+  $("zoomctl").hidden = name !== "radial";
+  document.body.classList.toggle("view-tree", name === "tree");
+  document.body.classList.toggle("view-radial", name === "radial");
+  V().show(true);
+  V().setRoot(from, false);
+  V().select(shared.sel);
+  V().highlight(shared.hover);
+  V().marks(shared.marks);
+  if (shared.result) V().reveal(shared.result);
 }
 
-// polyline from a node up the tree to one of its ancestors, following the drawn branches
-function routeUp(n, top) {
-  const pts = [P(angOf(n), nodeR(n))];
-  let x = n;
-  while (x !== top && x.parent) {
-    const p = x.parent, rp = rt(p.age), a = angOf(x), b = angOf(p);
-    pts.push(P(a, rp));
-    const steps = Math.ceil(Math.abs(b - a) / 0.02);
-    for (let i = 1; i <= steps; i++) pts.push(P(a + (b - a) * i / steps, rp));
-    x = p;
-  }
-  return pts;
-}
-const polyD = pts => "M" + pts.map(f2).join("L");
+const view = {
+  highlight(n) { shared.hover = n; V().highlight(n); },
+  select(n) { shared.sel = n; V().select(n); },
+  focus(n) { V().focus(n); },
+  reveal(res) { shared.result = res; V().reveal(res); },
+  reset(n) { V().reset(n); },
+  root: () => V().root(),
+  setRoot(n, animate) { V().setRoot(n, animate); },
+  marks(spec) { shared.marks = spec; V().marks(spec); },
+};
+$("up").onclick = () => V().goUp();
+BGSettings.on(key => { if (key === "view" && BGSettings.get("view") !== current) showView(BGSettings.get("view")); });
 
-function drawMarks() {
-  const areas = [], lines = [], pins = [], rings = [];
-  const area = (n, w) => { if (n.children && inView(n)) areas.push({ d: sectorD(v0(n), v1(n), rt(n.age), rOut), w }); };
-  const addFocus = (n, strong) => {
-    if (!inView(n)) return;
-    area(n, strong ? 2.5 : 1.5);
-    lines.push({ d: polyD(routeUp(n, drawRoot)), w: strong ? 3.2 : 2.4 });
-  };
-  if (marks) {
-    (marks.areas || []).forEach(m => {
-      if (m.node.children && inView(m.node)) areas.push({ d: sectorD(v0(m.node), v1(m.node), rt(m.node.age), rOut), w: m.strong ? 3.2 : 1.6, kind: m.kind });
-    });
-    (marks.routes || []).forEach(m => {
-      if (!inView(m.from) || !inView(m.to) || !inView(m.via)) return;
-      const pts = routeUp(m.from, m.via).concat(routeUp(m.to, m.via).reverse());
-      lines.push({ d: polyD(pts), w: 3.2, alt: m.alt, kind: m.kind });
-    });
-    (marks.rings || []).forEach(m => { if (m.age <= V.tmax) rings.push({ r: rt(m.age), kind: m.kind, label: m.label }); });
-    (marks.pins || []).forEach(m => {
-      if (!inView(m.node)) return;
-      const p = P(angOf(m.node), nodeR(m.node));
-      pins.push({ x: p[0], y: p[1], kind: m.kind, label: m.label });
-    });
-  } else if (result) {
-    const r = result;
-    if (!r.same) area(r.anc, 3);
-    if (inView(r.guess) && inView(r.answer) && inView(r.anc)) {
-      const up = routeUp(r.guess, r.anc), down = routeUp(r.answer, r.anc).reverse();
-      lines.push({ d: polyD(up.concat(down)), w: 3.4 });
-      pins.push({ x: up[0][0], y: up[0][1], kind: "guess" });
-      const end = down[down.length - 1];
-      pins.push({ x: end[0], y: end[1], kind: "answer" });
-    }
-  } else {
-    if (selN && inView(selN)) {
-      addFocus(selN, true);
-      const p = P(angOf(selN), nodeR(selN));
-      pins.push({ x: p[0], y: p[1], kind: "pick" });
-    }
-    if (hoverN && hoverN !== selN) addFocus(hoverN, false);
-  }
-  gArea.selectAll("path").data(areas).join("path").attr("class", d => "hl-area" + (d.kind ? " " + d.kind : "")).attr("d", d => d.d)
-    .style("stroke-width", d => u(d.w) + "px");
-  gLine.selectAll("path").data(lines).join("path").attr("class", d => "hl-line" + (d.alt ? " alt" : "") + (d.kind ? " " + d.kind : "")).attr("d", d => d.d)
-    .style("stroke-width", d => u(d.w) + "px");
-  gLine.selectAll("circle.hl-ring").data(rings).join("circle").attr("class", d => "hl-ring " + (d.kind || ""))
-    .attr("cx", c[0]).attr("cy", c[1]).attr("r", d => d.r * k).style("stroke-width", u(2.5) + "px")
-    .style("stroke-dasharray", `${u(6)} ${u(5)}`);
-  // ring labels sit in the gap at the top, where the period names are
-  gLine.selectAll("text.hl-ring-label").data(rings.filter(d => d.label)).join("text")
-    .attr("class", d => "hl-ring-label halo " + (d.kind || ""))
-    .attr("x", d => P(-Math.PI / 2 + GAP / 2 + 0.01, d.r)[0] + u(4)).attr("y", d => P(-Math.PI / 2 + GAP / 2 + 0.01, d.r)[1])
-    .style("font-size", u(11.5) + "px").style("stroke-width", u(3) + "px").text(d => d.label);
-  BG.drawPins(gPin, pins, u(1));
-}
-
-// pointer -> the lineage under it: angle picks the group, radius picks how far back in time
-function polar(e) {
-  const [x, y] = T.invert(d3.pointer(e, svg.node()));
-  const dx = x - C, dy = y - C;
-  return { r: Math.hypot(dx, dy), a: Math.atan2(dy, dx) };
-}
-function hit(e) {
-  let { r, a } = polar(e);
-  if (r > rOut + 170 || r < rIn) return null;
-  while (a < A0) a += 2 * Math.PI;
-  while (a >= A0 + 2 * Math.PI) a -= 2 * Math.PI;
-  if (a > A0 + SPAN) return null;
-  const g = V.w0 + (a - A0) / SPAN * (V.w1 - V.w0);
-  const leaf = viewLeaves.find(l => g >= l.g0 && g < l.g1) || viewLeaves[viewLeaves.length - 1];
-  let n = BG.lineageAt(leaf, r >= rOut ? 0 : tAt(r));
-  if (!n.ancestors().includes(viewRoot)) n = viewRoot;
-  const rep = leaf.ancestors().reverse().find(m => m.shown && m.children && !m.open);
-  if (rep && n.ancestors().includes(rep)) n = rep;
-  return n;
-}
-
-// ---- opening clades: the view's window glides from one clade to another
-function updateViewing() {
-  document.getElementById("view-name").textContent = viewRoot.name;
-  const bits = [viewRoot.data.common, `${viewRoot.nLeaves.toLocaleString("en-US")} species on the map`,
-    `~${BG.fmtAge(viewRoot.age)} My`].filter(Boolean);
-  document.getElementById("view-info").textContent = bits.join(" · ");
-  document.getElementById("up").disabled = viewRoot === limitRoot();
-}
-const limitRoot = () => (BG.roundClade ? BG.roundClade() : root);   // rounds cannot go above their clade
-
-function setRoot(n, animate = true) {
-  if (!n) return;
-  if (!n.children) n = n.parent;
-  const limit = limitRoot();
-  if (limit !== root && !n.ancestors().includes(limit)) n = limit;
-  if (n === viewRoot && !anim) return;
-  const from = { ...V }, to = { w0: n.g0, w1: n.g1, tmax: tmaxFor(n) };
-  drawRoot = BG.mrca(viewRoot, n);
-  viewRoot = n;
-  viewLeaves = n.leaves();
-  updateViewing();
-  svg.transition().duration(animate ? 400 : 0).call(zoom.transform, d3.zoomIdentity);
-  if (anim) anim.stop();
-  const finish = () => { V = to; drawRoot = n; anim = null; render(); };
-  if (!animate) { finish(); return; }
-  const dur = 750, ease = d3.easeCubicInOut;
-  anim = d3.timer(el => {
-    const t = Math.min(1, el / dur), e = ease(t);
-    V = {
-      w0: from.w0 + (to.w0 - from.w0) * e,
-      w1: from.w1 + (to.w1 - from.w1) * e,
-      tmax: Math.exp(Math.log(from.tmax) + (Math.log(to.tmax) - Math.log(from.tmax)) * e),
-    };
-    render();
-    if (t === 1) { anim.stop(); finish(); }
-  });
-}
-const goUp = () => { if (viewRoot.parent && viewRoot !== limitRoot()) setRoot(viewRoot.parent); };
-
-// geometric zoom, for detail inside the current view
-const zoom = d3.zoom().extent([[0, 0], [1000, 1000]]).scaleExtent([1, 150]).translateExtent([[-150, -150], [1150, 1150]])
-  .on("zoom", e => { T = e.transform; render(); });
-svg.call(zoom).on("dblclick.zoom", null);
-function zoomTo(n) {
-  const r0 = n.children ? rt(n.age) : rt(n.parent.age), r1 = rOut + 130, pts = [];
-  for (let i = 0; i <= 24; i++) {
-    const a = v0(n) + (v1(n) - v0(n)) * i / 24;
-    pts.push([C + r0 * Math.cos(a), C + r0 * Math.sin(a)], [C + r1 * Math.cos(a), C + r1 * Math.sin(a)]);
-  }
-  const [x0, x1] = d3.extent(pts, p => p[0]), [y0, y1] = d3.extent(pts, p => p[1]);
-  const kk = Math.max(1, Math.min(150, 0.92 * 1000 / Math.max(x1 - x0, y1 - y0)));
-  svg.transition().duration(700).call(zoom.transform,
-    d3.zoomIdentity.translate(500, 500).scale(kk).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
-}
-document.getElementById("zin").onclick = () => svg.transition().duration(350).call(zoom.scaleBy, 1.8);
-document.getElementById("zout").onclick = () => svg.transition().duration(350).call(zoom.scaleBy, 1 / 1.8);
-document.getElementById("zreset").onclick = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
-document.getElementById("up").onclick = goUp;
-
-svg.on("pointermove", e => BG.hover(hit(e)))
-  .on("pointerleave", () => BG.hover(null))
-  .on("click", e => {
-    if (polar(e).r < rIn) { goUp(); return; }            // the centre goes up a level
-    const n = hit(e);
-    if (n) BG.click(n);                                   // explore: show its information; rounds: pick it
-  })
-  .on("dblclick", e => {                                  // double-click opens a clade across the circle
-    const n = hit(e);
-    if (!n || !n.children) return;
-    setRoot(n);
-    BG.pin(n);                                            // the two single clicks before may have unpinned it
-  });
-
-BG.init({
-  highlight(n) { hoverN = n; drawMarks(); },
-  select(n) { selN = n; drawMarks(); },
-  focus(n) { setRoot(n.children ? n : n.parent); },
-  reveal(res) {
-    result = res;
-    drawMarks();
-    if (res && inView(res.anc)) zoomTo(res.anc);
-  },
-  reset(n) { setRoot(n || root); },
-  root: () => viewRoot,
-  setRoot,
-  marks(spec) { marks = spec; drawMarks(); },
-}, {
-  controls: [
-    { id: "t-eras", label: "Show geological periods", checked: true, onchange: v => { showEras = v; render(); } },
-    ...(BG.hasExtinct ? [{ id: "t-extinct", label: "Include extinct animals (†)", checked: BG.showExtinct,
-      onchange: v => BG.setShowExtinct(v) }] : []),
-  ],
+BG.init(view, {
   about: `<ol class="legend">
-    <li><b>Angle is lineage.</b> Every clade is one continuous slice, so rim neighbours are related at exactly the split where their branches meet.</li>
-    <li><b>Radius is time.</b> The centre is the base of the clade you are viewing and the rim is today, on a square-root scale. The rings are geological periods, or epochs for young clades.</li>
-    <li><b>Click</b> a species or clade to see it. <b>Double-click a clade to open it</b> across the whole circle; ↑, the centre, or the lineage list go back up. Shaded wedges are clades too small to draw at this size.</li>
-    ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. Turning them off also removes them from games.</li>` : ""}
+    <li class="only-radial"><b>Angle is lineage.</b> Every clade is one continuous slice, so rim neighbours are related at exactly the split where their branches meet.</li>
+    <li class="only-radial"><b>Radius is time.</b> The centre is the base of the clade you are viewing and the rim is today, on a square-root scale. The rings are geological periods, or epochs for young clades.</li>
+    <li class="only-tree"><b>Read left to right.</b> The clade you are viewing is on the left and today is on the right; branches meet where lineages split. Wedges are groups cut off by the depth set in Settings, with their size and a few photos.</li>
+    <li><b>Click</b> a species or clade to see it. <b>Double-click a clade to open it</b>; ↑ or the lineage list go back up.</li>
+    <li>Switch between the <b>radial</b> and <b>tree</b> views, and set how the tree is cut, in <b>⚙ Settings</b>.</li>
+    ${BG.hasExtinct ? `<li><b>† Extinct animals</b> end where they were last seen in the fossil record. They can be turned off in Settings.</li>` : ""}
   </ol>
   <p class="hint">${BG.REAL
     ? `${BG.leaves.length.toLocaleString("en-US")} species. Tree from the Open Tree of Life, dates from TimeTree (some interpolated), photos from iNaturalist. Built ${BG.meta.built}.`
     : "Demo tree of 55 groups. Run pipeline/build_tree.py to load real data."}</p>`,
 });
-updateViewing();
-new ResizeObserver(() => render()).observe(svg.node());
-render();
+
+// start in the saved view
+views.radial.show(false);
+views.tree.show(false);
+current = current === "tree" ? "radial" : "tree";   // so showView switches into the saved one
+showView(BGSettings.get("view") === "tree" ? "tree" : "radial");
 </script>
 </body>
 </html>

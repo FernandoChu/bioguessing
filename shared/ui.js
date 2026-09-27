@@ -69,6 +69,99 @@
     sel.onchange = () => onPick(items[+sel.value].n);
   }
 
+  // ---- the settings menu: every control reads and writes BGSettings
+  const AGE_MIN = 1;
+  function buildSettings($) {
+    const box = $("settings"), btn = $("settings-btn");
+    const seg = (key, options) => `<div class="seg" role="group" data-key="${key}">${options.map(([v, label]) =>
+      `<button data-value="${v}" aria-pressed="false">${label}</button>`).join("")}</div>`;
+    const check = (key, label) => `<label class="check"><input type="checkbox" data-key="${key}"><span>${label}</span></label>`;
+    box.innerHTML = `
+      <div class="settings-head"><h2>Settings</h2><button id="settings-close" aria-label="Close settings">✕</button></div>
+      <section>
+        <h3>Map view</h3>
+        ${seg("view", [["radial", "Radial"], ["tree", "Tree"]])}
+      </section>
+      <section class="tree-settings">
+        <h3>Tree view</h3>
+        <span class="hint">Cut the tree</span>
+        ${seg("treeCut", [["named", "By named groups"], ["time", "By age"]])}
+        <div data-show="treeCut=named" class="stack">
+          <span class="hint">Named levels shown below the clade you are viewing</span>
+          ${seg("treeDepth", [[1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [0, "All"]])}
+        </div>
+        <div data-show="treeCut=time" class="stack">
+          <label class="slider" for="set-age"><span class="hint">Collapse splits younger than</span>
+            <output id="set-age-out"></output>
+            <input type="range" id="set-age" min="0" max="1000" step="1">
+          </label>
+        </div>
+        <span class="hint">Branch lengths</span>
+        ${seg("treeLengths", [["time", "To time scale"], ["equal", "Evenly spaced"]])}
+        ${check("treeThumbs", "Photos on collapsed groups")}
+      </section>
+      <section>
+        <h3>Labels and time</h3>
+        ${check("commonNames", "Show common names")}
+        ${check("showEras", "Show geological periods")}
+      </section>
+      ${BG.hasExtinct ? `<section>
+        <h3>Animals</h3>
+        ${check("showExtinct", "Include extinct animals (†)")}
+        <span class="hint">Changing this reloads the page.</span>
+      </section>` : ""}`;
+
+    const ageMax = BG.MAX_AGE;
+    const toAge = v => AGE_MIN * Math.pow(ageMax / AGE_MIN, v / 1000);
+    const toSlider = a => Math.round(1000 * Math.log(a / AGE_MIN) / Math.log(ageMax / AGE_MIN));
+    function sync() {
+      box.querySelectorAll(".seg[data-key]").forEach(g => {
+        const v = String(BGSettings.get(g.dataset.key));
+        g.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.value === v));
+      });
+      box.querySelectorAll("input[type=checkbox][data-key]").forEach(i => { i.checked = !!BGSettings.get(i.dataset.key); });
+      box.querySelectorAll("[data-show]").forEach(el => {
+        const [k, v] = el.dataset.show.split("=");
+        el.hidden = String(BGSettings.get(k)) !== v;
+      });
+      $("set-age").value = toSlider(BGSettings.get("treeAge"));
+      $("set-age-out").textContent = `${BG.fmtAge(BGSettings.get("treeAge"))} million years`;
+      box.querySelector(".tree-settings").classList.toggle("inactive", BGSettings.get("view") !== "tree");
+    }
+    box.querySelectorAll(".seg[data-key]").forEach(g => {
+      g.querySelectorAll("button").forEach(b => {
+        b.onclick = () => {
+          const cur = BGSettings.get(g.dataset.key);
+          BGSettings.set(g.dataset.key, typeof cur === "number" ? +b.dataset.value : b.dataset.value);
+        };
+      });
+    });
+    box.querySelectorAll("input[type=checkbox][data-key]").forEach(i => {
+      i.onchange = () => {
+        if (i.dataset.key === "showExtinct") { BG.setShowExtinct(i.checked); return; }
+        BGSettings.set(i.dataset.key, i.checked);
+      };
+    });
+    $("set-age").oninput = e => {
+      const a = toAge(+e.target.value);
+      BGSettings.set("treeAge", +(a >= 10 ? Math.round(a) : a.toFixed(1)));
+    };
+    BGSettings.on(sync);
+    sync();
+
+    const open = on => {
+      box.hidden = !on;
+      btn.setAttribute("aria-expanded", on);
+      if (on) box.querySelector("button, input").focus();
+    };
+    btn.onclick = () => open(box.hidden);
+    $("settings-close").onclick = () => { open(false); btn.focus(); };
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !box.hidden) { open(false); btn.focus(); } });
+    document.addEventListener("pointerdown", e => {
+      if (!box.hidden && !e.target.closest(".settings-wrap")) open(false);
+    });
+  }
+
   BG.init = function (view, opts = {}) {
     const $ = id => document.getElementById(id);
     const S = { mode: "explore", pinned: null, hovered: null, game: games[0] || null, playRoot: BG.root };
@@ -81,15 +174,12 @@
       <div class="modes" role="tablist" aria-label="Mode">
         <button role="tab" id="mode-explore" aria-selected="true">Explore</button>
         <button role="tab" id="mode-play" aria-selected="false">Play</button>
+      </div>
+      <div class="settings-wrap">
+        <button id="settings-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings">⚙ Settings</button>
+        <div class="settings" id="settings" role="dialog" aria-label="Settings" hidden></div>
       </div>`;
-
-    const layers = opts.controls && opts.controls.length ? `
-      <section class="panel">
-        <h2>Layers</h2>
-        <div class="toggles">${opts.controls.map(c =>
-          `<label><input type="checkbox" id="${c.id}"${c.checked ? " checked" : ""}><span>${c.label}</span></label>`).join("")}
-        </div>
-      </section>` : "";
+    buildSettings($);
 
     $("panel").innerHTML = `
       <div id="explore-mode" class="mode-panels">
@@ -108,7 +198,6 @@
           <div class="thumbs" id="ex-thumbs" hidden></div>
           <ul class="crumbs" id="crumbs"></ul>
         </section>
-        ${layers}
         <section class="panel">
           <h2>How to read the map</h2>
           ${opts.about || ""}
@@ -122,22 +211,12 @@
           </label>
         </section>
         <div id="game-body"></div>
-        ${layers.replace(/id="(t-[a-z-]+)"/g, 'id="$1-play"')}
         <section class="panel">
           <h2>How to play</h2>
           <div id="game-howto"></div>
         </section>
       </div>`;
 
-    (opts.controls || []).forEach(c => {
-      [$(c.id), $(c.id + "-play")].forEach(box => {
-        if (!box) return;
-        box.onchange = e => {
-          [$(c.id), $(c.id + "-play")].forEach(b => { if (b) b.checked = e.target.checked; });
-          c.onchange(e.target.checked);
-        };
-      });
-    });
 
     // ---- Explore: lineage, species photos and clade thumbnails
     function crumbs(n) {

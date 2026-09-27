@@ -171,10 +171,8 @@
   const REAL = !!(window.BG_TREE && window.BG_TREE.tree);
   const FULL = REAL ? fromCompact(window.BG_TREE.tree) : TREE;
 
-  // Extinct animals can be switched off; the choice is remembered in this browser.
-  const EXTINCT_KEY = "bg-show-extinct";
-  let showExtinct = true;
-  try { showExtinct = localStorage.getItem(EXTINCT_KEY) !== "0"; } catch (e) { /* storage unavailable */ }
+  // Extinct animals can be switched off in the settings (shared/settings.js, loaded before this file).
+  const showExtinct = window.BGSettings ? BGSettings.get("showExtinct") : true;
   const hasExtinct = (function any(n) { return n.extinct || (n.children || []).some(any); })(FULL);
   // Without fossils: drop them, collapse clades left with one child, and use the living-only ages.
   function pruneExtinct(n) {
@@ -185,8 +183,8 @@
     return { ...n, children: kids, age: n.age0 != null ? n.age0 : n.age };
   }
   const SOURCE = showExtinct || !hasExtinct ? FULL : pruneExtinct(FULL);
-  function setShowExtinct(v) {
-    try { localStorage.setItem(EXTINCT_KEY, v ? "1" : "0"); } catch (e) { /* storage unavailable */ }
+  function setShowExtinct(v) {   // the tree is pruned at load, so a change needs a reload
+    if (window.BGSettings) BGSettings.set("showExtinct", v);
     location.reload();
   }
 
