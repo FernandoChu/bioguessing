@@ -30,10 +30,21 @@
       return depth > 0 && !n.unnamed && namedLevel >= depth;
     }
 
+    // rough text widths, for making room for labels
+    const textW = (str, fs) => str.length * fs * 0.56;
+    const CLADE_FS = 12.5, TIP_FS = 13, COMMON_FS = 12, THUMB = 38, SP_THUMB = 24, WEDGE = 26;
+    const tipName = n => (n.data.extinct ? "† " : "") + n.name;
+    const tipCommon = n => S("commonNames") && n.data.common ? n.data.common : "";
+    function tipLabelWidth(n) {
+      const main = textW(tipName(n), TIP_FS) + (tipCommon(n) ? textW("  " + tipCommon(n), COMMON_FS) : 0);
+      const count = n.children ? textW("~999k species · 999 on the map", 11.5) : 0;
+      const pics = !S("treeThumbs") ? 0 : n.children ? 3 * (THUMB + 4) + 6 : SP_THUMB + 8;
+      return Math.max(main, count) + pics;
+    }
+
     function layout() {
-      const W = Math.max(320, el.clientWidth || 700);
-      const labelW = Math.min(360, Math.max(170, W * 0.44));
-      const x0 = 14, xTip = W - labelW;
+      const cw = Math.max(320, el.clientWidth || 700);
+      const timed = S("treeLengths") === "time";
       const tips = [], shown = new Set(), tipOf = new Set();
       (function walk(n, level) {
         shown.add(n);
@@ -43,7 +54,7 @@
       })(viewRoot, 0);
 
       // rows: species are short, cut-off groups are taller to fit their photos
-      const groupRow = S("treeThumbs") ? 50 : 36, spRow = 28, top = 8;
+      const groupRow = S("treeThumbs") ? 50 : 36, spRow = S("treeThumbs") ? 32 : 28, top = 8;
       let y = top;
       const pos = new Map();
       tips.forEach(t => {
@@ -52,38 +63,49 @@
         y += h;
       });
       const H = y + top;
-
-      const tmax = tmaxFor(viewRoot);
-      const X = t => x0 + (xTip - x0) * (1 - Math.sqrt(Math.max(0, Math.min(t, tmax)) / tmax));
-      const timed = S("treeLengths") === "time";
-      const WEDGE = 26;   // width of a cut-off group's wedge when branches are evenly spaced
-      const height = new Map();
-      (function h(n) {
-        const v = tipOf.has(n) ? 0 : 1 + Math.max(...n.children.map(h));
-        height.set(n, v);
-        return v;
-      })(viewRoot);
-      const step = (xTip - WEDGE - x0) / Math.max(1, height.get(viewRoot));
-      (function place(n) {
+      tips.forEach(t => { pos.get(t).row = true; });
+      (function ys(n) {
+        if (tipOf.has(n)) return pos.get(n).y;
+        const v = n.children.map(ys);
         const p = pos.get(n) || {};
-        if (tipOf.has(n)) {
-          if (n.children) {             // a cut-off group: its split, then a wedge to the tips' line
-            p.x = timed ? X(n.age) : xTip - WEDGE;
-            p.end = xTip;
-          } else {                      // a species: living ones reach today, extinct ones stop early
-            p.x = timed ? X(n.data.extinct ? n.data.la : 0) : xTip;
-            p.end = p.x;
-          }
-        } else {
-          n.children.forEach(place);
-          const ys = n.children.map(c => pos.get(c).y);
-          p.y = (ys[0] + ys[ys.length - 1]) / 2;
-          p.x = timed ? X(n.age) : xTip - WEDGE - height.get(n) * step;
-          p.end = p.x;
-        }
+        p.y = (v[0] + v[v.length - 1]) / 2;
         pos.set(n, p);
+        return p.y;
       })(viewRoot);
-      L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X, timed };
+
+      // the root's name sits on its stem at the far left
+      const x0 = 12 + textW(viewRoot.name, CLADE_FS) + 14;
+      const tmax = tmaxFor(viewRoot);
+      let xTip = 0, X = null;
+      if (timed) {
+        // positions follow time; tips of living species line up at today
+        const labelW = Math.min(420, Math.max(200, cw * 0.42));
+        xTip = Math.max(x0 + 120, cw - labelW);
+        X = t => x0 + (xTip - x0) * (1 - Math.sqrt(Math.max(0, Math.min(t, tmax)) / tmax));
+        L = { X };
+        (function place(n) {
+          const p = pos.get(n);
+          if (tipOf.has(n) && n.children) { p.x = X(n.age); p.end = xTip; }
+          else if (!n.children) { p.x = X(n.data.extinct ? n.data.la : 0); p.end = p.x; p.label = xTip + 8; }
+          else { p.x = X(n.age); p.end = p.x; n.children.forEach(place); }
+          if (p.label === undefined) p.label = p.end + 8;
+        })(viewRoot);
+      } else {
+        // evenly spaced: every branch is as long as the name written on it
+        const len = n => (!tipOf.has(n) && n.children && !n.unnamed) ? Math.max(24, textW(n.name, CLADE_FS) + 16) : 18;
+        (function place(n, x) {
+          const p = pos.get(n);
+          p.x = x;
+          if (tipOf.has(n) && n.children) p.end = x + WEDGE;
+          else p.end = x;
+          p.label = p.end + 8;
+          if (!tipOf.has(n)) n.children.forEach(c => place(c, x + len(c)));
+        })(viewRoot, x0);
+        xTip = Math.max(...tips.map(t => pos.get(t).end));
+      }
+      const needed = Math.max(...tips.map(t => pos.get(t).label + tipLabelWidth(t))) + 14;
+      const W = Math.max(cw, Math.ceil(needed));
+      L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X: X || (() => 0), timed };
     }
 
     // the drawn node that stands for n (n itself, or the cut-off group it is inside)
@@ -120,13 +142,13 @@
       const segs = [];
       L.shown.forEach(n => {
         const p = pos.get(n);
-        const from = n === viewRoot ? L.x0 - 8 : pos.get(n.parent).x;
+        const from = n === viewRoot ? 10 : pos.get(n.parent).x;
         segs.push({ k: "h" + n.name, h: n.hue, d: `M${f1(from)},${f1(p.y)}H${f1(p.x)}` });
         if (!L.tipOf.has(n)) {
           const ys = n.children.map(c => pos.get(c).y);
           segs.push({ k: "v" + n.name, h: n.hue, d: `M${f1(p.x)},${f1(ys[0])}V${f1(ys[ys.length - 1])}` });
         }
-        if (!n.children && n.data.extinct && p.x < xTip - 1) {
+        if (L.timed && !n.children && n.data.extinct && p.x < xTip - 1) {
           segs.push({ k: "g" + n.name, ghost: true, d: `M${f1(p.x)},${f1(p.y)}H${f1(xTip)}` });
         }
       });
@@ -138,12 +160,12 @@
       const groups = tips.filter(t => t.children);
       gBranch.selectAll("path.wedge").data(groups, n => n.name).join("path").attr("class", "wedge fill-h")
         .attr("style", n => `--h:${n.hue.toFixed(1)}`)
-        .attr("d", n => { const p = pos.get(n), h = p.h / 2 - 5; return `M${f1(p.x)},${f1(p.y)}L${f1(xTip)},${f1(p.y - h)}V${f1(p.y + h)}Z`; });
+        .attr("d", n => { const p = pos.get(n), h = p.h / 2 - 5; return `M${f1(p.x)},${f1(p.y)}L${f1(p.end)},${f1(p.y - h)}V${f1(p.y + h)}Z`; });
       gBranch.selectAll("circle").data([...L.shown].filter(n => n.children && !L.tipOf.has(n)), n => n.name).join("circle")
         .attr("class", "dot-h").attr("style", n => `--h:${n.hue.toFixed(1)}`)
         .attr("cx", n => pos.get(n).x).attr("cy", n => pos.get(n).y).attr("r", 2.6);
 
-      // tip labels
+      // tip labels: name and common name, a count for cut-off groups, and photos after the text
       const tipText = gLabel.selectAll("g.tip").data(tips, n => n.name).join(enter => {
         const g = enter.append("g").attr("class", "tip");
         const t = g.append("text").attr("class", "tlabel");
@@ -152,34 +174,44 @@
         g.append("text").attr("class", "tcount");
         return g;
       });
-      const maxChars = Math.floor((W - xTip - 20) / 7);
-      const clip = (s, n) => s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s;
       tipText.each(function (n) {
         const g = d3.select(this), p = pos.get(n), group = !!n.children;
-        const thumbs = group && S("treeThumbs") ? 3 : 0;
-        const room = maxChars - thumbs * 6;
-        const t = g.select("text.tlabel").attr("x", xTip + 8).attr("y", group ? p.y - 8 : p.y);
-        const name = (n.data.extinct ? "† " : "") + n.name;
-        t.select(".n").classed("sp", !group && BG.REAL).style("font-size", group ? "13.5px" : "13px").text(clip(name, room));
-        const common = S("commonNames") && n.data.common ? n.data.common : "";
-        t.select(".c").style("font-size", "12px").text(common && name.length + 2 < room ? "  " + clip(common, room - name.length - 2) : "");
-        g.select("text.tcount").attr("x", xTip + 8).attr("y", p.y + 10).style("font-size", "11.5px")
-          .text(group ? `${n.data.total ? "~" + BG.fmtCount(n.data.total) + " species" : n.nLeaves + " species"} · ${n.nLeaves} on the map` : "");
-        // a few photos of the group's best-known species
-        const pics = !thumbs ? [] : n.leaves().filter(l => (l.data.photos || []).length)
-          .sort((a, b) => (b.data.obs || 0) - (a.data.obs || 0)).slice(0, thumbs);
+        const t = g.select("text.tlabel").attr("x", p.label).attr("y", group ? p.y - 8 : p.y);
+        t.select(".n").classed("sp", !group && BG.REAL).style("font-size", TIP_FS + "px").text(tipName(n));
+        t.select(".c").style("font-size", COMMON_FS + "px").text(tipCommon(n) ? "  " + tipCommon(n) : "");
+        const countText = group ? `${n.data.total ? "~" + BG.fmtCount(n.data.total) + " species" : n.nLeaves + " species"} · ${n.nLeaves} on the map` : "";
+        g.select("text.tcount").attr("x", p.label).attr("y", p.y + 10).style("font-size", "11.5px").text(countText);
+        const textEnd = p.label + Math.max(textW(tipName(n), TIP_FS) + (tipCommon(n) ? textW("  " + tipCommon(n), COMMON_FS) : 0),
+          group ? textW(countText, 11.5) : 0) + 8;
+        const pics = !S("treeThumbs") ? [] : (group
+          ? n.leaves().filter(l => (l.data.photos || []).length).sort((a, b) => (b.data.obs || 0) - (a.data.obs || 0)).slice(0, 3)
+          : ((n.data.photos || []).length ? [n] : []));
+        const size = group ? THUMB : SP_THUMB;
         g.selectAll("image").data(pics, l => l.name).join("image")
           .attr("href", l => l.data.photos[0].u.replace("/medium.", "/square."))
-          .attr("width", 38).attr("height", 38).attr("preserveAspectRatio", "xMidYMid slice")
-          .attr("x", (l, i) => W - 8 - (pics.length - i) * 42).attr("y", p.y - 19);
+          .attr("width", size).attr("height", size).attr("preserveAspectRatio", "xMidYMid slice")
+          .attr("x", (l, i) => textEnd + i * (size + 4)).attr("y", p.y - size / 2);
       });
 
-      // names of drawn clades sit on their branch, when there is room
-      const named = [...L.shown].filter(n => n !== viewRoot && n.children && !L.tipOf.has(n) && !n.unnamed &&
-        pos.get(n).x - pos.get(n.parent).x >= n.name.length * 7 + 12);
-      gLabel.selectAll("text.clabel").data(named, n => n.name).join("text").attr("class", "clabel halo")
+      // every named clade has its name on its own branch, ending at its split (the root's on its stem);
+      // on a time scale a name may reach past its branch, and bigger clades win when names collide
+      const cladeNodes = [...L.shown].filter(n => n.children && !L.tipOf.has(n) && !n.unnamed)
+        .sort((a, b) => (a === viewRoot ? -1 : b === viewRoot ? 1 : b.nLeaves - a.nLeaves));
+      const taken = tips.map(t => { const p = pos.get(t); return [p.label - 2, p.y - p.h / 2, p.label + tipLabelWidth(t), p.y + p.h / 2]; });
+      const placed = [];
+      cladeNodes.forEach(n => {
+        const p = pos.get(n), w = textW(n.name, CLADE_FS);
+        const box = [p.x - 5 - w, p.y - 6 - CLADE_FS, p.x - 3, p.y - 3];
+        if (n !== viewRoot && taken.some(b => !(box[2] < b[0] || box[0] > b[2] || box[3] < b[1] || box[1] > b[3]))) return;
+        taken.push(box);
+        placed.push(n);
+      });
+      gLabel.selectAll("text.cname").data(placed, n => n.name).join("text").attr("class", "cname halo")
+        .attr("style", n => `--h:${n.hue.toFixed(1)}`)
         .attr("x", n => pos.get(n).x - 5).attr("y", n => pos.get(n).y - 6).attr("text-anchor", "end")
-        .style("font-size", "10px").style("letter-spacing", ".06em").style("stroke-width", "3px").text(n => n.name);
+        .style("font-size", CLADE_FS + "px").style("stroke-width", "3px")
+        .text(n => n.name);
+      gLabel.selectAll("text.clabel").remove();
 
       drawMarks();
     }
@@ -200,7 +232,7 @@
       if (!r) return null;
       const tips = L.tips.filter(t => t === r || t.ancestors().includes(r));
       const a = px(tips[0]), b = px(tips[tips.length - 1]);
-      return { x: L.tipOf.has(r) && !r.children ? L.xTip - 4 : px(r).x, y: a.y - a.h / 2 + 1, y2: b.y + b.h / 2 - 1 };
+      return { x: !r.children ? px(r).end - 4 : px(r).x, y: a.y - a.h / 2 + 1, y2: b.y + b.h / 2 - 1 };
     }
 
     function drawMarks() {

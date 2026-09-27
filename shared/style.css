@@ -91,6 +91,7 @@ aside{display:flex;flex-direction:column;gap:14px}
 .tv-axis svg,.tv-svg{display:block}
 .tv-svg{cursor:crosshair;user-select:none;-webkit-user-select:none}
 .tv-svg .tcount{fill:var(--muted);font-family:var(--sans)}
+.tv-svg .cname{fill:hsl(var(--h,150),var(--br-s),var(--br-l));font-family:var(--sans);font-weight:700}
 .tv-svg image{clip-path:inset(0 round 5px)}
 body.playing .treeview{outline:2px solid var(--accent);outline-offset:-2px}
 body.view-tree .only-radial,body.view-radial .only-tree{display:none}
