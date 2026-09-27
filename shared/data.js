@@ -251,6 +251,30 @@
     return n;
   }
 
+  // Colours for one view: the whole hue wheel is shared out among the branches below `top`, in
+  // proportion to how many drawn tips (isTip) each holds, with a gap between siblings so neighbouring
+  // branches always differ. Recomputed whenever the view changes.
+  function hueMap(top, isTip) {
+    const weight = new Map();
+    (function w(n) {
+      const v = isTip(n) || !n.children ? 1 : n.children.reduce((a, c) => a + w(c), 0);
+      weight.set(n, v);
+      return v;
+    })(top);
+    const out = new Map();
+    (function g(n, h0, h1) {
+      out.set(n, (h0 + h1) / 2);
+      if (isTip(n) || !n.children) return;
+      let h = h0;
+      n.children.forEach(c => {
+        const span = (h1 - h0) * weight.get(c) / weight.get(n), pad = span * 0.1;
+        g(c, h + pad, h + span - pad);
+        h += span;
+      });
+    })(top, 0, 340);
+    return out;
+  }
+
   const fmtAge = a => a >= 10 ? String(Math.round(a)) : a.toFixed(1);
   // 83.6 -> "83.6 million years ago", 0.0117 -> "12 thousand years ago"
   const fmtAgo = a => a >= 1 ? `${fmtAge(a)} million years ago` : `${Math.max(1, Math.round(a * 1000))} thousand years ago`;
@@ -262,7 +286,7 @@
     : c >= 1e4 ? Math.round(c / 1e3) + "k" : c >= 1e3 ? (c / 1e3).toFixed(1).replace(/\.0$/, "") + "k" : String(c);
 
   window.BG = {
-    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount, livedText,
+    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount, livedText, hueMap,
     showExtinct, hasExtinct, setShowExtinct,
     REAL, meta: REAL ? window.BG_TREE.meta : null, leafNoun: REAL ? "species" : "groups",
   };

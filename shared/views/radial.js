@@ -58,6 +58,12 @@
     // extinct species end at their last appearance instead of at today's rim
     const nodeR = n => n.children ? rt(n.age) : n.data.extinct ? rt(n.data.la) : rOut;
     const angOf = n => n.walked ? n.ang : (v0(n) + v1(n)) / 2;
+    // colours span the whole wheel within the clade being drawn (see BG.hueMap)
+    let hues = BG.hueMap(root, n => !n.children), huesFor = root;
+    const hueOf = n => {
+      if (huesFor !== drawRoot) { hues = BG.hueMap(drawRoot, x => !x.children); huesFor = drawRoot; }
+      return (hues.get(n) ?? n.hue).toFixed(1);
+    };
     const inView = n => n === drawRoot || n.ancestors().includes(drawRoot);
 
     function render() {
@@ -105,31 +111,31 @@
       const shown = nodes.filter(n => n.shown);
       const collapsed = shown.filter(n => n.children && !n.open);
       gWedge.selectAll("path").data(collapsed, n => n.name).join("path").attr("class", "wedge fill-h")
-        .attr("style", n => `--h:${n.hue.toFixed(1)}`)
+        .attr("style", n => `--h:${hueOf(n)}`)
         .attr("d", n => sectorD(v0(n) + 0.004, v1(n) - 0.004, rt(n.age), rOut));
 
       // branches: radial stems plus an arc joining each open clade's children
       const segs = [];
       shown.forEach(n => {
         const r0 = n.parent ? rt(n.parent.age) : rIn;
-        segs.push({ key: "s" + n.name, h: n.hue, d: "M" + f2(P(n.ang, r0)) + "L" + f2(P(n.ang, nodeR(n))), w: 1.7 });
+        segs.push({ key: "s" + n.name, h: hueOf(n), d: "M" + f2(P(n.ang, r0)) + "L" + f2(P(n.ang, nodeR(n))), w: 1.7 });
         if (!n.children && n.data.extinct && nodeR(n) < rOut - 1) {
           segs.push({ key: "g" + n.name, ghost: true, d: "M" + f2(P(n.ang, nodeR(n))) + "L" + f2(P(n.ang, rOut)), w: 1 });
         }
         if (n.open) {
           const kids = n.children.filter(ch => ch.walked);
-          if (kids.length) segs.push({ key: "a" + n.name, h: n.hue, d: arcD(rt(n.age), kids[0].ang, kids[kids.length - 1].ang), w: 1.7 });
+          if (kids.length) segs.push({ key: "a" + n.name, h: hueOf(n), d: arcD(rt(n.age), kids[0].ang, kids[kids.length - 1].ang), w: 1.7 });
         }
       });
       gBranch.selectAll("path").data(segs, d => d.key).join("path").attr("class", d => d.ghost ? "ghost" : "stroke-h")
-        .attr("style", d => d.ghost ? null : `--h:${d.h.toFixed(1)}`).attr("d", d => d.d)
+        .attr("style", d => d.ghost ? null : `--h:${d.h}`).attr("d", d => d.d)
         .style("stroke-width", d => u(d.w) + "px").style("stroke-dasharray", d => d.ghost ? `${u(1)} ${u(4)}` : null);
       const ends = shown.filter(n => !n.children && n.data.extinct && (v1(n) - v0(n)) * rOut * s >= 6);
       gBranch.selectAll("text.dagger").data(ends, n => n.name).join("text").attr("class", "dagger eralabel")
         .attr("x", n => P(n.ang, nodeR(n) + 6)[0]).attr("y", n => P(n.ang, nodeR(n) + 6)[1])
         .style("font-size", u(11) + "px").text("†");
       gBranch.selectAll("circle").data(shown.filter(n => n.open), n => n.name).join("circle").attr("class", "dot-h")
-        .attr("style", n => `--h:${n.hue.toFixed(1)}`)
+        .attr("style", n => `--h:${hueOf(n)}`)
         .attr("cx", n => P(n.ang, rt(n.age))[0]).attr("cy", n => P(n.ang, rt(n.age))[1]).attr("r", u(2.6));
 
       // rim labels for tips and collapsed clades
