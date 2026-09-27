@@ -131,20 +131,34 @@
         }
         L = { X };
       } else {
-        // evenly spaced: every branch is as long as the name written on it
+        // evenly spaced: every branch is at least as long as the name written on it, then all branches
+        // are stretched by the same factor so the widest row ends at the right edge of the panel
         const len = n => (!tipOf.has(n) && n.children && !n.unnamed) ? Math.max(24, textW(n.name, CLADE_FS) + 16) : 18;
+        const depthOf = new Map();
+        (function d(n, x) {
+          depthOf.set(n, x);
+          if (!tipOf.has(n)) n.children.forEach(c => d(c, x + len(c)));
+        })(viewRoot, 0);
+        const tail = t => (isGroupRow(t) && t.children ? WEDGE : 0) + 8 + tipLabelWidth(t);
+        let stretch = Infinity;
+        tips.forEach(t => {
+          const path = depthOf.get(t);
+          if (path > 0) stretch = Math.min(stretch, (cw - 30 - x0 - tail(t)) / path);
+        });
+        stretch = Math.max(1, Math.min(stretch, 6));
         (function place(n, x) {
           const p = pos.get(n);
           p.x = x;
           if (tipOf.has(n) && n.children) p.end = x + WEDGE;
           else p.end = x;
           p.label = p.end + 8;
-          if (!tipOf.has(n)) n.children.forEach(c => place(c, x + len(c)));
+          if (!tipOf.has(n)) n.children.forEach(c => place(c, x + len(c) * stretch));
         })(viewRoot, x0);
         xTip = Math.max(...tips.map(t => pos.get(t).end));
       }
       const needed = Math.max(...tips.map(t => pos.get(t).label + tipLabelWidth(t))) + 14;
-      const W = Math.max(cw, Math.ceil(needed));
+      // only widen (and scroll sideways) when the rows really do not fit
+      const W = needed > cw ? Math.ceil(needed) : cw;
       L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X: X || (() => 0), timed, exact };
       L.color = BG.colorGroups(viewRoot, n => tipOf.has(n));
     }
