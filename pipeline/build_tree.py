@@ -732,6 +732,8 @@ def build_tree(newick, species, broken, proxies=None):
             if only.get("sp"):
                 # a species under a single-species genus etc.: the species survives
                 only["aliases"] = ([n["name"]] if n["name"] else []) + only.get("aliases", []) + n.get("aliases", [])
+                # remember the folded groups' Open Tree ids, to look up how big they are
+                only["alias_ids"] = {**only.get("alias_ids", {}), **n.get("ids", {})}
                 return only
             merged = {
                 "name": n["name"] or only["name"],
@@ -858,6 +860,11 @@ def clade_names(tree, species):
         if c and c.lower() != n["name"].lower():
             n["common"] = tidy_common(c)
     log(f"  iNaturalist common names for {sum(1 for n in named if n.get('common'))} of {len(named)} named clades")
+    # species that stand alone for a group (the only sampled calcareous sponge): name that group too
+    for n in iter_nodes(tree):
+        if not n["children"] and n.get("aliases"):
+            n["alias_common"] = {a: tidy_common(common_by_name[a]) for a in n["aliases"]
+                                 if a in common_by_name and common_by_name[a].lower() != a.lower()}
     missing = [n for n in named if not n.get("common") and n.get("ott")]
     try:
         wikidata_names(missing)
@@ -893,7 +900,9 @@ def species_totals(tree):
     internal = [n for n in iter_nodes(tree) if n["children"]]
     for n in internal:
         n["count_id"] = n.get("ids", {}).get(n["name"]) or n.get("node_id")
-    ids = sorted({n["count_id"] for n in internal if n.get("count_id")})
+    lone = [n for n in iter_nodes(tree) if not n["children"] and n.get("alias_ids")]
+    ids = sorted({n["count_id"] for n in internal if n.get("count_id")} |
+                 {nid for n in lone for nid in n["alias_ids"].values()})
     tips = {}
     for i in range(0, len(ids), 100):
         chunk = ids[i:i + 100]
@@ -915,7 +924,13 @@ def species_totals(tree):
         n["total"] = t
         return t
     total(tree)
-    log(f"  species totals for {sum(1 for n in internal if n.get('count_id') in tips)} of {len(internal)} clades")
+    # groups a lone species stands for, broadest first
+    for n in lone:
+        groups = [(a, n.get("alias_common", {}).get(a), tips.get(nid)) for a, nid in n["alias_ids"].items()
+                  if a in n.get("aliases", []) and tips.get(nid)]
+        n["groups"] = sorted(groups, key=lambda g: -g[2])
+    log(f"  species totals for {sum(1 for n in internal if n.get('count_id') in tips)} of {len(internal)} clades, "
+        f"and for the groups {sum(1 for n in lone if n.get('groups'))} lone species stand for")
 
 
 def taxon_age(name):
@@ -1153,6 +1168,8 @@ def compact(n):
     else:
         sp = n["sp"]
         out["c"] = sp.get("common")
+        if n.get("groups"):
+            out["gr"] = [[g[0], g[1], g[2]] for g in n["groups"]]
         if sp.get("extinct"):
             out["x"] = [round(sp["fa"], 2), round(sp["la"], 4)]
         else:

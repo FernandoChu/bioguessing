@@ -35,6 +35,7 @@ node = { n: name|null, a: age in Mya, ott, al: [aliases], c: common name,
          t: total species in the clade, lb / lc: descriptive label when there is no name,
          a0: the clade's age when extinct species are hidden (only where it differs),
          x: [first, last appearance in Mya] for extinct species,
+         gr: [[name, common, total], ...] named groups a species is the only sampled member of, broadest first,
          k: [children]                        // clades only
          inat, obs, ph: [{u, a, l, o}] }      // species only: photo url, attribution, license, observation
 ```

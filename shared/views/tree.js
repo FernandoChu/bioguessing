@@ -33,12 +33,25 @@
     // rough text widths, for making room for labels
     const textW = (str, fs) => str.length * fs * 0.56;
     const CLADE_FS = 12.5, TIP_FS = 13, COMMON_FS = 12, THUMB = 38, SP_THUMB = 24, WEDGE = 26;
-    const tipName = n => (n.data.extinct ? "† " : "") + n.name;
-    const tipCommon = n => S("commonNames") && n.data.common ? n.data.common : "";
+    // When the tree is cut at a level, a species that is the only sampled member of a named group
+    // stands for that group (Clathrina clathrus for the calcareous sponges), so its row is the group.
+    const cutting = () => S("treeCut") === "time" || S("treeDepth") > 0;
+    const groupOf = n => (!n.children && cutting() && n.data.groups && n.data.groups.length ? n.data.groups[0] : null);
+    const isGroupRow = n => !!n.children || !!groupOf(n);
+    const tipName = n => { const g = groupOf(n); return g ? g.name : (n.data.extinct ? "† " : "") + n.name; };
+    const tipCommon = n => {
+      const g = groupOf(n), c = g ? g.common : n.data.common;
+      return S("commonNames") && c ? c : "";
+    };
+    const countText = n => {
+      if (n.children) return `${n.data.total ? "~" + BG.fmtCount(n.data.total) + " species" : n.nLeaves + " species"} · ${n.nLeaves} on the map`;
+      const g = groupOf(n);
+      return g ? `~${BG.fmtCount(g.total)} species · 1 on the map: ${(n.data.extinct ? "† " : "") + n.name}` : "";
+    };
     function tipLabelWidth(n) {
       const main = textW(tipName(n), TIP_FS) + (tipCommon(n) ? textW("  " + tipCommon(n), COMMON_FS) : 0);
-      const count = n.children ? textW("~999k species · 999 on the map", 11.5) : 0;
-      const pics = !S("treeThumbs") ? 0 : n.children ? 3 * (THUMB + 4) + 6 : SP_THUMB + 8;
+      const count = isGroupRow(n) ? textW(countText(n), 11.5) : 0;
+      const pics = !S("treeThumbs") ? 0 : n.children ? 3 * (THUMB + 4) + 6 : groupOf(n) ? THUMB + 10 : SP_THUMB + 8;
       return Math.max(main, count) + pics;
     }
 
@@ -61,7 +74,7 @@
       let y = top;
       const pos = new Map();
       tips.forEach(t => {
-        const h = t.children ? groupRow : spRow;
+        const h = isGroupRow(t) ? groupRow : spRow;
         pos.set(t, { y: y + h / 2, h });
         y += h;
       });
@@ -205,15 +218,15 @@
         return g;
       });
       tipText.each(function (n) {
-        const g = d3.select(this), p = pos.get(n), group = !!n.children;
+        const g = d3.select(this), p = pos.get(n), group = isGroupRow(n);
         const t = g.select("text.tlabel").attr("x", p.label).attr("y", group ? p.y - 8 : p.y);
-        t.select(".n").classed("sp", !group && BG.REAL).style("font-size", TIP_FS + "px").text(tipName(n));
+        t.select(".n").classed("sp", !group && BG.REAL).classed("grp", group).style("font-size", TIP_FS + "px").text(tipName(n));
         t.select(".c").style("font-size", COMMON_FS + "px").text(tipCommon(n) ? "  " + tipCommon(n) : "");
-        const countText = group ? `${n.data.total ? "~" + BG.fmtCount(n.data.total) + " species" : n.nLeaves + " species"} · ${n.nLeaves} on the map` : "";
-        g.select("text.tcount").attr("x", p.label).attr("y", p.y + 10).style("font-size", "11.5px").text(countText);
+        const count = countText(n);
+        g.select("text.tcount").attr("x", p.label).attr("y", p.y + 10).style("font-size", "11.5px").text(count);
         const textEnd = p.label + Math.max(textW(tipName(n), TIP_FS) + (tipCommon(n) ? textW("  " + tipCommon(n), COMMON_FS) : 0),
-          group ? textW(countText, 11.5) : 0) + 8;
-        const pics = !S("treeThumbs") ? [] : (group
+          group ? textW(count, 11.5) : 0) + 8;
+        const pics = !S("treeThumbs") ? [] : (n.children
           ? n.leaves().filter(l => (l.data.photos || []).length).sort((a, b) => (b.data.obs || 0) - (a.data.obs || 0)).slice(0, 3)
           : ((n.data.photos || []).length ? [n] : []));
         const size = group ? THUMB : SP_THUMB;

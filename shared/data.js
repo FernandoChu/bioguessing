@@ -164,7 +164,9 @@
     // clades without a formal name carry a descriptive label ("Strigiformes + Accipitriformes")
     const n = { name: o.n, label: o.lb, common: o.c || o.lc || "", age: o.a, est: !!o.est, aliases: o.al || [], ott: o.ott, total: o.t };
     if (o.k) Object.assign(n, { children: o.k.map(fromCompact), age0: o.a0 });
-    else Object.assign(n, { inat: o.inat, obs: o.obs, photos: o.ph || [] });
+    else Object.assign(n, { inat: o.inat, obs: o.obs, photos: o.ph || [],
+      // named groups this species is the only sampled member of, broadest first
+      groups: (o.gr || []).map(([name, common, total]) => ({ name, common, total })) });
     if (o.x) Object.assign(n, { extinct: true, fa: o.x[0], la: o.x[1] });
     return n;
   }

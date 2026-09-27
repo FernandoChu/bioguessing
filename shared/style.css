@@ -160,6 +160,7 @@ header{position:relative}
 .halo{paint-order:stroke;stroke:var(--halo);stroke-linejoin:round}
 .tlabel{fill:var(--ink);dominant-baseline:central}
 .tlabel .n{font-family:var(--serif);font-weight:600}
+.tlabel .n.grp{font-style:normal;font-weight:600}
 .tlabel .c{font-family:var(--sans);fill:var(--muted);font-weight:400}
 .clabel{font-family:var(--sans);font-weight:700;text-transform:uppercase;fill:var(--ink);dominant-baseline:central}
 .hl-area{fill:var(--accent-soft);stroke:var(--accent);pointer-events:none}
