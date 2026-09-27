@@ -928,7 +928,10 @@ def species_totals(tree):
     for n in lone:
         groups = [(a, n.get("alias_common", {}).get(a), tips.get(nid)) for a, nid in n["alias_ids"].items()
                   if a in n.get("aliases", []) and tips.get(nid)]
-        n["groups"] = sorted(groups, key=lambda g: -g[2])
+        # biggest first; groups of the same size are the same species under nested names, so the
+        # broader name wins (aliases are stored broadest first: Dermoptera before Cynocephalidae)
+        order = {a: i for i, a in enumerate(n.get("aliases", []))}
+        n["groups"] = sorted(groups, key=lambda g: (-g[2], order.get(g[0], 99)))
     log(f"  species totals for {sum(1 for n in internal if n.get('count_id') in tips)} of {len(internal)} clades, "
         f"and for the groups {sum(1 for n in lone if n.get('groups'))} lone species stand for")
 
