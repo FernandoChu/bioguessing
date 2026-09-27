@@ -251,28 +251,36 @@
     return n;
   }
 
-  // Colours for one view: the whole hue wheel is shared out among the branches below `top`, in
-  // proportion to how many drawn tips (isTip) each holds, with a gap between siblings so neighbouring
-  // branches always differ. Recomputed whenever the view changes.
-  function hueMap(top, isTip) {
-    const weight = new Map();
+  // Colours for one view: the branches on screen are split into at most 8 groups, each drawn in one
+  // colour of a fixed categorical palette (--cat-0 .. --cat-7 in style.css). Start from the top
+  // clade's branches and keep splitting the biggest group while there are colours left; groups take
+  // the colours in tree order, so neighbouring groups always get palette neighbours, which are
+  // validated to be clearly different. Branches above the groups are drawn neutral.
+  // Returns a function node -> CSS colour.
+  const CATS = 8;
+  function colorGroups(top, isTip) {
+    const tipCount = new Map();
     (function w(n) {
       const v = isTip(n) || !n.children ? 1 : n.children.reduce((a, c) => a + w(c), 0);
-      weight.set(n, v);
+      tipCount.set(n, v);
       return v;
     })(top);
-    const out = new Map();
-    (function g(n, h0, h1) {
-      out.set(n, (h0 + h1) / 2);
-      if (isTip(n) || !n.children) return;
-      let h = h0;
-      n.children.forEach(c => {
-        const span = (h1 - h0) * weight.get(c) / weight.get(n), pad = span * 0.1;
-        g(c, h + pad, h + span - pad);
-        h += span;
-      });
-    })(top, 0, 340);
-    return out;
+    const splittable = g => !isTip(g) && g.children;
+    let groups = splittable(top) ? top.children.slice() : [top];
+    for (;;) {
+      const big = groups.filter(g => splittable(g) && groups.length - 1 + g.children.length <= CATS)
+        .sort((a, b) => tipCount.get(b) - tipCount.get(a))[0];
+      if (!big || tipCount.get(big) < 2) break;
+      groups.splice(groups.indexOf(big), 1, ...big.children);
+    }
+    const slot = new Map(groups.map((g, i) => [g, i]));
+    return n => {
+      for (let a = n; a; a = a.parent) {
+        if (slot.has(a)) return `var(--cat-${slot.get(a)})`;
+        if (a === top) break;
+      }
+      return "var(--branch-neutral)";
+    };
   }
 
   const fmtAge = a => a >= 10 ? String(Math.round(a)) : a.toFixed(1);
@@ -286,7 +294,7 @@
     : c >= 1e4 ? Math.round(c / 1e3) + "k" : c >= 1e3 ? (c / 1e3).toFixed(1).replace(/\.0$/, "") + "k" : String(c);
 
   window.BG = {
-    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount, livedText, hueMap,
+    root, nodes, leaves, byName, MYSTERY: mystery, ERAS, MAX_AGE, tf, tfInv, mrca, score, lineageAt, fmtAge, fmtCount, livedText, colorGroups,
     showExtinct, hasExtinct, setShowExtinct,
     REAL, meta: REAL ? window.BG_TREE.meta : null, leafNoun: REAL ? "species" : "groups",
   };

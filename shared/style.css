@@ -4,6 +4,9 @@
   --halo:rgba(248,250,248,.85); --band:rgba(22,33,29,.05); --ring:rgba(22,33,29,.13);
   --accent:#0F6479; --accent-soft:rgba(15,100,121,.13); --answer:#C2410C; --answer-soft:rgba(194,65,12,.12); --guess:#16211D;
   --good:#2E7D32; --good-soft:rgba(46,125,50,.14);
+  /* categorical branch colours, validated in this order on this surface */
+  --cat-0:#2a78d6; --cat-1:#eb6834; --cat-2:#1baf7a; --cat-3:#eda100;
+  --cat-4:#e87ba4; --cat-5:#008300; --cat-6:#4a3aa7; --cat-7:#e34948; --branch-neutral:#7d8a84;
   --cell-l:81%; --cell-s:46%; --br-l:36%; --br-s:45%;
   --serif:"Literata",Georgia,"Times New Roman",serif;
   --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -15,6 +18,8 @@
     --halo:rgba(16,22,20,.85); --band:rgba(227,235,231,.05); --ring:rgba(227,235,231,.12);
     --accent:#63C7DC; --accent-soft:rgba(99,199,220,.15); --answer:#F2894A; --answer-soft:rgba(242,137,74,.16); --guess:#E3EBE7;
     --good:#7BCB80; --good-soft:rgba(123,203,128,.16);
+    --cat-0:#3987e5; --cat-1:#d95926; --cat-2:#199e70; --cat-3:#c98500;
+    --cat-4:#d55181; --cat-5:#008300; --cat-6:#9085e9; --cat-7:#e66767; --branch-neutral:#8a9892;
     --cell-l:31%; --cell-s:32%; --br-l:70%; --br-s:42%;
   }
 }
@@ -24,6 +29,8 @@
   --halo:rgba(16,22,20,.85); --band:rgba(227,235,231,.05); --ring:rgba(227,235,231,.12);
   --accent:#63C7DC; --accent-soft:rgba(99,199,220,.15); --answer:#F2894A; --answer-soft:rgba(242,137,74,.16); --guess:#E3EBE7;
     --good:#7BCB80; --good-soft:rgba(123,203,128,.16);
+    --cat-0:#3987e5; --cat-1:#d95926; --cat-2:#199e70; --cat-3:#c98500;
+    --cat-4:#d55181; --cat-5:#008300; --cat-6:#9085e9; --cat-7:#e66767; --branch-neutral:#8a9892;
   --cell-l:31%; --cell-s:32%; --br-l:70%; --br-s:42%;
 }
 *{box-sizing:border-box}
@@ -91,7 +98,7 @@ aside{display:flex;flex-direction:column;gap:14px}
 .tv-axis svg,.tv-svg{display:block}
 .tv-svg{cursor:crosshair;user-select:none;-webkit-user-select:none}
 .tv-svg .tcount{fill:var(--muted);font-family:var(--sans)}
-.tv-svg .cname{fill:hsl(var(--h,150),var(--br-s),var(--br-l));font-family:var(--sans);font-weight:700}
+.tv-svg .cname{fill:var(--ink);font-family:var(--sans);font-weight:700}
 .tv-svg image{clip-path:inset(0 round 5px)}
 body.playing .treeview{outline:2px solid var(--accent);outline-offset:-2px}
 body.view-tree .only-radial,body.view-radial .only-tree{display:none}
@@ -143,6 +150,9 @@ header{position:relative}
 .fill-h{fill:hsl(var(--h,150),var(--cell-s),calc(var(--cell-l) + var(--dl,0%)))}
 .stroke-h{stroke:hsl(var(--h,150),var(--br-s),var(--br-l));fill:none;stroke-linecap:round}
 .dot-h{fill:hsl(var(--h,150),var(--br-s),var(--br-l))}
+.stroke-c{stroke:var(--c,var(--branch-neutral));fill:none;stroke-linecap:round}
+.fill-c{fill:var(--c,var(--branch-neutral));fill-opacity:.32;stroke:var(--c,var(--branch-neutral));stroke-width:1px}
+.dot-c{fill:var(--c,var(--branch-neutral))}
 .band{fill:var(--band)}
 .band.off{fill:none}
 .ring{fill:none;stroke:var(--ring)}

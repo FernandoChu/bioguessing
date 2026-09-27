@@ -106,13 +106,13 @@
       const needed = Math.max(...tips.map(t => pos.get(t).label + tipLabelWidth(t))) + 14;
       const W = Math.max(cw, Math.ceil(needed));
       L = { tips, shown, tipOf, pos, W, H, x0, xTip, tmax, X: X || (() => 0), timed };
-      L.hue = BG.hueMap(viewRoot, n => tipOf.has(n));
+      L.color = BG.colorGroups(viewRoot, n => tipOf.has(n));
     }
 
     // the drawn node that stands for n (n itself, or the cut-off group it is inside)
     const rep = n => n.ancestors().find(a => L.shown.has(a)) || null;
     const inView = n => n === viewRoot || n.ancestors().includes(viewRoot);
-    const hueOf = n => ((L && L.hue && L.hue.get(n)) ?? n.hue).toFixed(1);
+    const colorOf = n => (L && L.color ? L.color(n) : "var(--branch-neutral)");
     const px = n => L.pos.get(n);
 
     function render() {
@@ -145,26 +145,26 @@
       L.shown.forEach(n => {
         const p = pos.get(n);
         const from = n === viewRoot ? 10 : pos.get(n.parent).x;
-        segs.push({ k: "h" + n.name, h: hueOf(n), d: `M${f1(from)},${f1(p.y)}H${f1(p.x)}` });
+        segs.push({ k: "h" + n.name, c: colorOf(n), d: `M${f1(from)},${f1(p.y)}H${f1(p.x)}` });
         if (!L.tipOf.has(n)) {
           const ys = n.children.map(c => pos.get(c).y);
-          segs.push({ k: "v" + n.name, h: hueOf(n), d: `M${f1(p.x)},${f1(ys[0])}V${f1(ys[ys.length - 1])}` });
+          segs.push({ k: "v" + n.name, c: colorOf(n), d: `M${f1(p.x)},${f1(ys[0])}V${f1(ys[ys.length - 1])}` });
         }
         if (L.timed && !n.children && n.data.extinct && p.x < xTip - 1) {
           segs.push({ k: "g" + n.name, ghost: true, d: `M${f1(p.x)},${f1(p.y)}H${f1(xTip)}` });
         }
       });
       gBranch.selectAll("path.seg").data(segs, d => d.k).join("path")
-        .attr("class", d => "seg " + (d.ghost ? "ghost" : "stroke-h"))
-        .attr("style", d => d.ghost ? "stroke-dasharray:1 4" : `--h:${d.h}`)
+        .attr("class", d => "seg " + (d.ghost ? "ghost" : "stroke-c"))
+        .attr("style", d => d.ghost ? "stroke-dasharray:1 4" : `--c:${d.c}`)
         .style("stroke-width", d => d.ghost ? "1px" : "1.8px").attr("d", d => d.d);
       // cut-off groups: a wedge from their split to the tips' line
       const groups = tips.filter(t => t.children);
-      gBranch.selectAll("path.wedge").data(groups, n => n.name).join("path").attr("class", "wedge fill-h")
-        .attr("style", n => `--h:${hueOf(n)}`)
+      gBranch.selectAll("path.wedge").data(groups, n => n.name).join("path").attr("class", "wedge fill-c")
+        .attr("style", n => `--c:${colorOf(n)}`)
         .attr("d", n => { const p = pos.get(n), h = p.h / 2 - 5; return `M${f1(p.x)},${f1(p.y)}L${f1(p.end)},${f1(p.y - h)}V${f1(p.y + h)}Z`; });
       gBranch.selectAll("circle").data([...L.shown].filter(n => n.children && !L.tipOf.has(n)), n => n.name).join("circle")
-        .attr("class", "dot-h").attr("style", n => `--h:${hueOf(n)}`)
+        .attr("class", "dot-c").attr("style", n => `--c:${colorOf(n)}`)
         .attr("cx", n => pos.get(n).x).attr("cy", n => pos.get(n).y).attr("r", 2.6);
 
       // tip labels: name and common name, a count for cut-off groups, and photos after the text
@@ -209,7 +209,6 @@
         placed.push(n);
       });
       gLabel.selectAll("text.cname").data(placed, n => n.name).join("text").attr("class", "cname halo")
-        .attr("style", n => `--h:${hueOf(n)}`)
         .attr("x", n => pos.get(n).x - 5).attr("y", n => pos.get(n).y - 6).attr("text-anchor", "end")
         .style("font-size", CLADE_FS + "px").style("stroke-width", "3px")
         .text(n => n.name);
