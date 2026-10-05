@@ -165,6 +165,19 @@ FOSSIL_STEM = {
     ("Teleostei",): [(None, None, ["Leedsichthys problematicus"])],
     ("Coleoidea",): [(None, None, ["Dactylioceras commune"])],
 }
+# Branching orders set by hand where Open Tree's synthesis follows a minority result. The named
+# groups under a clade are regrouped as given; each level is (clade name, common name, [parts]) and
+# a part is a group name or another level. Applied only when the listed groups cover the clade.
+CURATED_TOPOLOGY = {
+    # Upham et al. 2019; Foley et al. 2023 (Zoonomia): bats are outside Ferae + Euungulata
+    "Laurasiatheria": ["Eulipotyphla", ("Scrotifera", None, [
+        "Chiroptera",
+        ("Fereuungulata", None, [
+            ("Ferae", "carnivorans and pangolins", ["Carnivora", "Pholidota"]),
+            ("Euungulata", "hoofed mammals", ["Artiodactyla", "Perissodactyla"]),
+        ]),
+    ])],
+}
 OK_IMAGE_LICENSES = re.compile(r"^(cc0|public domain|pd|cc by(-sa)? [0-9.]+|cc by(-sa)?)", re.I)
 
 # Species on the early branches of big groups. The most-observed species rarely include them,
@@ -873,6 +886,43 @@ def clade_names(tree, species):
     log(f"  common names for {sum(1 for n in named if n.get('common'))} of {len(named)} named clades")
 
 
+def curate_topology(tree):
+    """Regroup clades as CURATED_TOPOLOGY says, keeping the named groups' subtrees as they are."""
+    def leaves(n):
+        return {id(m) for m in iter_nodes(n) if not m["children"]}
+
+    for clade, parts in CURATED_TOPOLOGY.items():
+        root = next((n for n in iter_nodes(tree) if n["children"] and n["name"] == clade), None)
+        if not root:
+            log(f"  ! {clade} not in the tree; skipping its curated topology")
+            continue
+        groups = {}
+        for n in iter_nodes(root):
+            for nm in [n["name"]] + n.get("aliases", []):
+                if nm and nm not in groups:
+                    groups[nm] = n
+
+        def build(p):
+            if isinstance(p, str):
+                return groups.get(p)
+            name, common, sub = p
+            kids = [k for k in (build(s) for s in sub) if k]
+            if len(kids) < 2:  # a group missing from the sample: the level is just what is left
+                return kids[0] if kids else None
+            node = {"name": name, "ott": None, "children": kids, "aliases": []}
+            if common:
+                node["common"] = common
+            return node
+
+        kids = [k for k in (build(p) for p in parts) if k]
+        covered = [leaves(k) for k in kids]
+        if sum(map(len, covered)) != len(leaves(root)) or set().union(*covered) != leaves(root):
+            log(f"  ! curated groups do not cover {clade}; keeping Open Tree's topology")
+            continue
+        root["children"] = kids
+        log(f"  curated topology for {clade}")
+
+
 def wikidata_names(named):
     otts = sorted({str(n["ott"]) for n in named})
     names = {}
@@ -1209,6 +1259,7 @@ def main():
     tree["name"] = tree["name"] or "Animalia"
     log("4. clade names (iNaturalist, Wikidata)")
     clade_names(tree, species)
+    curate_topology(tree)
     log("4b. placing extinct species")
     tree = place_fossils(tree, fossils)
     fossil_clade_minimums(tree)
