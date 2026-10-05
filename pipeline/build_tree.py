@@ -514,12 +514,24 @@ def place_fossils(tree, fossils):
         return idx
 
     def as_clade(found, node):
-        """A group represented by one species becomes a clade around it, so fossils can join it."""
+        """A group represented by one species becomes a clade around it, so fossils can join it.
+        The clade takes that group and the broader ones (aliases are broadest first) with their
+        Open Tree ids, so their species totals still apply."""
         if node["children"]:
             return node
         par = parent_of(node)
-        clade = {"name": found, "ott": None, "children": [node], "fossil_clade": False}
-        node["aliases"] = [a for a in node.get("aliases", []) if a != found]
+        aliases = node.get("aliases", [])
+        cut = aliases.index(found) + 1 if found in aliases else 0
+        ids = node.get("alias_ids", {})
+        clade = {"name": found, "ott": None, "children": [node], "fossil_clade": False,
+                 "aliases": [a for a in aliases[:cut] if a != found],
+                 "ids": {a: ids[a] for a in aliases[:cut] if a in ids}}
+        common = node.get("alias_common", {})
+        if common.get(found):
+            clade["common"] = common[found]
+        node["aliases"] = aliases[cut:]
+        node["alias_ids"] = {a: i for a, i in ids.items() if a not in clade["ids"]}
+        node["alias_common"] = {a: c for a, c in common.items() if a in node["aliases"]}
         par["children"][par["children"].index(node)] = clade
         return clade
 
@@ -710,7 +722,9 @@ def parse_newick(s):
     return node()
 
 
-LABEL_RE = re.compile(r"^(.*)_ott(\d+)$")
+# "Felis_catus_ott563163", or quoted when the name is used in another kingdom too:
+# "Gadus morhua (species in domain Eukaryota) ott114170"
+LABEL_RE = re.compile(r"^(.*?)(?: \([^()]*\))?[_ ]ott(\d+)$")
 
 
 def build_tree(newick, species, broken, proxies=None):
@@ -871,6 +885,8 @@ def clade_names(tree, species):
     def dedupe(n, used):
         if n["children"] and n["name"] in used:
             n["name"] = None
+        if not n["children"] and n.get("aliases"):  # nor as a group that one species stands for
+            n["aliases"] = [a for a in n["aliases"] if a not in used]
         inner = used | ({n["name"]} if n["name"] else set())
         for c in n["children"]:
             dedupe(c, inner)
