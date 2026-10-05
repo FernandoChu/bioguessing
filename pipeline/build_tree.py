@@ -177,6 +177,12 @@ CURATED_TOPOLOGY = {
             ("Euungulata", "hoofed mammals", ["Artiodactyla", "Perissodactyla"]),
         ]),
     ])],
+    # Roca et al. 2004; Brace et al. 2016; Sato et al. 2016: solenodons first, then moles, and
+    # hedgehogs with shrews (Open Tree follows Meredith et al. 2011, which pairs shrews with moles)
+    "Eulipotyphla": ["Solenodontidae", ("Erinaceota", None, [
+        "Talpidae",
+        (None, None, ["Soricidae", "Erinaceidae"]),
+    ])],
 }
 OK_IMAGE_LICENSES = re.compile(r"^(cc0|public domain|pd|cc by(-sa)? [0-9.]+|cc by(-sa)?)", re.I)
 
@@ -196,9 +202,10 @@ ANCHORS = [
     # reptiles and birds: side-necked turtles, tuatara, gharial, ratites
     ["Chelodina longicollis", "Chelus fimbriata"], ["Sphenodon punctatus"], ["Gavialis gangeticus"],
     ["Struthio camelus"], ["Dromaius novaehollandiae"], ["Apteryx mantelli"],
-    # mammals: monotremes, xenarthrans, afrotheres, strepsirrhines, tarsiers
+    # mammals: monotremes, xenarthrans, afrotheres, strepsirrhines, tarsiers, solenodons
     ["Ornithorhynchus anatinus"], ["Tachyglossus aculeatus"], ["Dasypus novemcinctus"],
     ["Loxodonta africana"], ["Orycteropus afer"], ["Lemur catta"], ["Carlito syrichta", "Tarsius tarsier"],
+    ["Solenodon paradoxus"],
     # insects: silverfish, bristletails, sawflies, primitive moths, aphids
     ["Lepisma saccharinum", "Ctenolepisma longicaudatum"], ["Petrobius brevistylis", "Petrobius maritimus"],
     ["Cimbex americana", "Tenthredo scrophulariae"], ["Micropterix calthella", "Micropterix aureatella"], ["Aphis nerii"],
@@ -237,11 +244,14 @@ def is_cached(url, params=None, body=None):
     return cache_path(url, params, body).exists()
 
 
-def http(url, *, params=None, body=None, accept="application/json", raw=False, allow_status=()):
-    """GET (or POST JSON when body is given). Successful responses are cached on disk."""
+def http(url, *, params=None, body=None, form=None, accept="application/json", raw=False, allow_status=()):
+    """GET (or POST JSON when body is given, or a form when form is given). Successful responses
+    are cached on disk."""
     if params:
         url = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
     data = json.dumps(body).encode() if body is not None else None
+    if form is not None:
+        data = urllib.parse.urlencode(form).encode()
     key = hashlib.sha1((url + "\n" + (data.decode() if data else "")).encode()).hexdigest()
     path = CACHE / key[:2] / (key + ".json")
     if path.exists():
@@ -254,7 +264,7 @@ def http(url, *, params=None, body=None, accept="application/json", raw=False, a
         time.sleep(wait)
     headers = {"User-Agent": USER_AGENT, "Accept": accept}
     if data is not None:
-        headers["Content-Type"] = "application/json"
+        headers["Content-Type"] = "application/x-www-form-urlencoded" if form is not None else "application/json"
     req = urllib.request.Request(url, data=data, headers=headers)
     for attempt in range(5):
         _last_call[host] = time.time()
@@ -920,6 +930,17 @@ def curate_topology(tree):
             log(f"  ! curated groups do not cover {clade}; keeping Open Tree's topology")
             continue
         root["children"] = kids
+        levels = set()
+
+        def level_names(p):
+            if not isinstance(p, str):
+                levels.add(p[0])
+                for q in p[2]:
+                    level_names(q)
+        for p in parts:
+            level_names(p)
+        # a name that now belongs to a level inside the clade is no longer one of its aliases
+        root["aliases"] = [a for a in root.get("aliases", []) if a not in levels]
         log(f"  curated topology for {clade}")
 
 
@@ -934,7 +955,8 @@ def wikidata_names(named):
           ?item wdt:P9157 ?ott .
           OPTIONAL {{ ?item wdt:P1843 ?common . FILTER(LANG(?common) = "en") }}
         }}"""
-        _, d = http("https://query.wikidata.org/sparql", params={"query": q, "format": "json"},
+        # POST: the long GET form of this query was being rate-limited (HTTP 429) while POST went through
+        _, d = http("https://query.wikidata.org/sparql", form={"query": q},
                     accept="application/sparql-results+json")
         for b in d["results"]["bindings"]:
             if "common" in b and b["ott"]["value"] not in names:
